@@ -1,0 +1,6 @@
+{
+  "name": "ثبت ساعت کاری",
+  "description": "اپلیکیشن موبایل فارسی و راست‌به‌چپ برای ثبت و مدیریت ساعات کاری، مرخصی و اضافه‌کار با تقویم شمسی و ذخیره‌سازی محلی",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
