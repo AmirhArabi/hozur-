@@ -34,7 +34,12 @@ jobs:
 
       # Step 4: Install npm dependencies using clean install
       - name: Install dependencies
-        run: npm ci
+        run: |
+          if [ -f "package-lock.json" ]; then
+            npm ci
+          else
+            npm install
+          fi
 
       # Step 5: Run unit tests for calculation and Jalali calendar logic
       - name: Run unit tests
