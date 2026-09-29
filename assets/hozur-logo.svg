@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!-- Dark Rounded Background -->
+  <rect width="1024" height="1024" rx="224" ry="224" fill="#121214"/>
+  
+  <!-- Outer Clock Ring -->
+  <circle cx="512" cy="512" r="320" fill="none" stroke="#FFFFFF" stroke-width="44"/>
+  
+  <!-- 12 O'clock Muted Dot -->
+  <circle cx="512" cy="275" r="16" fill="#9CA3AF"/>
+  
+  <!-- Hour Hand pointing to 8:30 (~193 deg) -->
+  <line x1="512" y1="512" x2="336" y2="554" stroke="#9CA3AF" stroke-width="40" stroke-linecap="round"/>
+  
+  <!-- Minute Hand pointing to 6 o'clock -->
+  <line x1="512" y1="512" x2="512" y2="736" stroke="#FFFFFF" stroke-width="42" stroke-linecap="round"/>
+  
+  <!-- Central Pivot -->
+  <circle cx="512" cy="512" r="34" fill="#FFFFFF"/>
+</svg>

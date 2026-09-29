@@ -17,8 +17,9 @@ export const Header: React.FC<HeaderProps> = ({
       <div className="max-w-md mx-auto px-4 h-14 flex items-center justify-between">
         {/* Zone 1: Single text element wordmark */}
         <div className="flex items-center gap-2">
-          <span className="font-bold text-lg tracking-tight text-neutral-900 dark:text-neutral-50">
-            ثبت ساعت کاری
+          <img src="./icon.png" alt="hozur" className="w-6 h-6 rounded-lg object-contain shadow-xs" />
+          <span className="font-bold text-base tracking-tight text-neutral-900 dark:text-neutral-50 font-mono">
+            hozur
           </span>
         </div>
 

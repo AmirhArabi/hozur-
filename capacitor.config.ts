@@ -1,8 +1,8 @@
 import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
-  appId: 'com.example.worktracker',
-  appName: 'ثبت ساعت کاری',
+  appId: 'com.hozur.app',
+  appName: 'hozur',
   webDir: 'dist',
   server: {
     androidScheme: 'https'
