@@ -216,3 +216,47 @@ test('calculateMonthStats elapsedWorkDaysCount and elapsedQuotaMinutes calculati
     'elapsedQuotaMinutes must equal elapsedWorkDaysCount * dailyQuotaMinutes'
   );
 });
+
+test('calculateMonthStats daily overtime on normal work days shows immediately', () => {
+  const testSettings = {
+    ...DEFAULT_SETTINGS,
+    dailyQuotaHours: 8,
+    dailyQuotaMinutes: 30, // 510 minutes
+    isThursdayHoliday: false
+  };
+
+  // Find a normal work day in Mehr 1404 (e.g. 1404/07/01 Saturday)
+  const workInterval = {
+    id: 'w1',
+    date: '1404/07/01', // Saturday
+    startTime: '08:00',
+    endTime: '18:30', // 10h 30m = 630 minutes -> 120 minutes overtime
+    createdAt: Date.now()
+  };
+
+  const result = calculateMonthStats({
+    year: 1404,
+    month: 7,
+    intervals: [workInterval],
+    leaves: [],
+    holidays: DEFAULT_FIXED_HOLIDAYS,
+    settings: testSettings
+  });
+
+  assert.equal(result.dailyBreakdown['1404/07/01'].workMinutes, 630);
+  assert.equal(
+    result.dailyBreakdown['1404/07/01'].overtimeMinutes,
+    120,
+    'Saturday daily overtime should be 120 minutes (2 hours)'
+  );
+  assert.equal(
+    result.normalOvertimeMinutes,
+    120,
+    'Monthly normal overtime should be 120 minutes (2 hours)'
+  );
+  assert.equal(
+    result.totalOvertimeMinutes,
+    120,
+    'Total overtime should be 120 minutes'
+  );
+});

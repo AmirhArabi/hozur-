@@ -393,20 +393,14 @@ export function calculateMonthStats(params: {
   const D_minutes = workDaysCount * dailyQuotaMinutes;
   const elapsedQuotaMinutes = elapsedWorkDaysCount * dailyQuotaMinutes;
   const remainingMinutes = Math.max(0, D_minutes - P_minutes - L_minutes);
-  const normalOvertimeMinutes = Math.max(0, P_minutes - D_minutes);
-  const totalOvertimeMinutes = normalOvertimeMinutes + H_minutes;
-  const totalWorkMinutes = P_minutes + H_minutes;
 
   // Second pass: Calculate day-by-day chronological accumulated overtime
   // Rule:
-  // - Days processed chronologically.
   // - On a holiday, full work of that day is overtime.
-  // - On a normal work day, overtime equals the increase in accumulated monthly normal overtime on that day:
-  //   cumNormalOvertime(day) - cumNormalOvertime(prevDay), where
-  //   cumNormalOvertime = max(0, cumWorkNormal - D_minutes).
+  // - On a normal work day, work exceeding the daily quota is daily overtime.
+  // - Accumulated normal overtime reflects all daily overtimes on work days (or month surplus if higher).
   const dailyBreakdown: Record<string, DayCalculationResult> = {};
-  let cumNormalWork = 0;
-  let prevCumNormalOvertime = 0;
+  let normalOvertimeMinutes = 0;
   let cumTotalOvertime = 0;
   let cumTotalWork = 0;
 
@@ -418,11 +412,9 @@ export function calculateMonthStats(params: {
       // Holiday: all work today is overtime
       dayOvertime = d.workMinutes;
     } else {
-      // Normal work day
-      cumNormalWork += d.workMinutes;
-      const currentCumNormalOvertime = Math.max(0, cumNormalWork - D_minutes);
-      dayOvertime = currentCumNormalOvertime - prevCumNormalOvertime;
-      prevCumNormalOvertime = currentCumNormalOvertime;
+      // Normal work day: any work exceeding daily quota is daily overtime
+      dayOvertime = Math.max(0, d.workMinutes - dailyQuotaMinutes);
+      normalOvertimeMinutes += dayOvertime;
     }
 
     cumTotalOvertime += dayOvertime;
@@ -442,6 +434,11 @@ export function calculateMonthStats(params: {
     };
   }
 
+  // Ensure normal overtime also reflects month-end net surplus if higher
+  normalOvertimeMinutes = Math.max(normalOvertimeMinutes, Math.max(0, P_minutes - D_minutes));
+  const totalOvertimeMinutes = normalOvertimeMinutes + H_minutes;
+  const totalWorkMinutes = P_minutes + H_minutes;
+
   return {
     year,
     month,
@@ -459,6 +456,7 @@ export function calculateMonthStats(params: {
     remainingMinutes,
     normalOvertimeMinutes,
     totalOvertimeMinutes,
+    totalOvertime: totalOvertimeMinutes,
     dailyBreakdown
   };
 }

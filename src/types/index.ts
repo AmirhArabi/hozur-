@@ -72,5 +72,6 @@ export interface MonthCalculationResult {
   remainingMinutes: number; // max(0, D - P - L)
   normalOvertimeMinutes: number; // max(0, P - D)
   totalOvertimeMinutes: number; // normalOvertime + H
+  totalOvertime?: number; // alias for totalOvertimeMinutes
   dailyBreakdown: Record<string, DayCalculationResult>;
 }

@@ -182,6 +182,11 @@ export const StatsTab: React.FC<StatsTabProps> = ({
     return `${toPersianDigits(h)}:${toPersianDigits(String(m).padStart(2, '0'))}`;
   };
 
+  // Ensure calculated overtime is cleanly extracted from monthStats
+  const calculatedTotalOvertime = monthStats?.totalOvertime ?? monthStats?.totalOvertimeMinutes ?? 0;
+  const calculatedNormalOvertime = monthStats?.normalOvertimeMinutes ?? 0;
+  const calculatedHolidayOvertime = monthStats?.H_minutes ?? 0;
+
   return (
     <div className="space-y-4 pb-20 pt-2 animate-in fade-in duration-200">
       {/* Month Navigator Header */}
@@ -270,11 +275,11 @@ export const StatsTab: React.FC<StatsTabProps> = ({
               <PlusCircle className="w-4 h-4 text-neutral-400" />
             </div>
             <div className="font-mono font-bold text-2xl text-neutral-950 dark:text-neutral-50 tabular-nums">
-              {formatHMPersian(monthStats.totalOvertimeMinutes)}
+              {formatHMPersian(calculatedTotalOvertime)}
             </div>
             <div className="text-[10px] text-neutral-400 mt-1">
-              عادی: {formatHMPersian(monthStats.normalOvertimeMinutes)} | تعطیل:{' '}
-              {formatHMPersian(monthStats.H_minutes)}
+              عادی: {formatHMPersian(calculatedNormalOvertime)} | تعطیل:{' '}
+              {formatHMPersian(calculatedHolidayOvertime)}
             </div>
           </div>
         </div>

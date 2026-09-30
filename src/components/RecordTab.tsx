@@ -174,8 +174,10 @@ export const RecordTab: React.FC<RecordTabProps> = ({
     targetDailyQuota - totalDayWorkMinutes - totalDayLeaveMinutes
   );
 
-  // Overtime today from chronological calculations
-  const overtimeTodayMinutes = dayCalculations ? dayCalculations.overtimeMinutes : 0;
+  // Overtime today calculation (live and accurate for selected date)
+  const overtimeTodayMinutes = !isWorkDay
+    ? totalDayWorkMinutes
+    : Math.max(0, totalDayWorkMinutes - targetDailyQuota);
 
   // Entry reminder banner check
   const reminderMinutes = settings.entryReminderTime
