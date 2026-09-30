@@ -16,12 +16,11 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # Step 2: Set up Node.js 20 with npm cache
-      - name: Set up Node.js 20
+      # Step 2: Set up Node.js 22 (Capacitor 8 CLI requires Node >= 22)
+      - name: Set up Node.js 22
         uses: actions/setup-node@v4
         with:
-          node-version: 20
-          cache: 'npm'
+          node-version: 22
 
       # Step 3: Set up Java JDK 21 (Temurin)
       # Note: Capacitor 7 and 8 require Java 21 / Android SDK 35.
@@ -31,14 +30,9 @@ jobs:
           distribution: 'temurin'
           java-version: '21'
 
-      # Step 4: Install npm dependencies using clean install
+      # Step 4: Install npm dependencies safely without lockfile strictness
       - name: Install dependencies
-        run: |
-          if [ -f "package-lock.json" ]; then
-            npm ci
-          else
-            npm install
-          fi
+        run: npm install
 
       # Step 5: Run unit tests for calculation and Jalali calendar logic
       - name: Run unit tests
