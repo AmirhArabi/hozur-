@@ -23,11 +23,13 @@ import {
   formatJalaliDate,
   getCurrentJalaliDate,
   getCurrentTimeString,
+  getJalaliDayOfWeek,
   PERSIAN_MONTH_NAMES,
   PERSIAN_WEEKDAYS,
   toPersianDigits
 } from './utils/jalali';
 import { StorageService } from './services/storage';
+import { NotificationService } from './services/notifications';
 import { Header } from './components/Header';
 import { BottomNav } from './components/BottomNav';
 import { RecordTab } from './components/RecordTab';
@@ -80,6 +82,10 @@ export default function App() {
       setLeaves(storedLeaves);
       setHolidays(storedHolidays);
       setSettings(storedSettings);
+
+      if (storedSettings.entryReminderEnabled) {
+        NotificationService.scheduleEntryReminder(storedSettings.entryReminderTime || '09:00');
+      }
     } catch (err) {
       console.error('Failed loading data from storage:', err);
     } finally {
@@ -266,9 +272,10 @@ export default function App() {
     });
   }, [today.year, today.month, intervals, leaves, holidays, settings, nowMinutes, todayDateStr]);
 
-  // Today Persian Date String for Header
-  const todayWeekdayName = PERSIAN_WEEKDAYS[today.day % 7]; // or accurate weekday
-  const todayHeaderString = `${toPersianDigits(today.day)} ${PERSIAN_MONTH_NAMES[today.month - 1]} ${toPersianDigits(today.year)}`;
+  // Today Persian Date String for Header (بزرگ‌تر و کامل‌تر با نام روز هفته)
+  const todayDayOfWeek = getJalaliDayOfWeek(today.year, today.month, today.day);
+  const todayWeekdayName = PERSIAN_WEEKDAYS[todayDayOfWeek];
+  const todayHeaderString = `${todayWeekdayName}، ${toPersianDigits(today.day)} ${PERSIAN_MONTH_NAMES[today.month - 1]} ${toPersianDigits(today.year)}`;
 
   if (isLoading) {
     return (

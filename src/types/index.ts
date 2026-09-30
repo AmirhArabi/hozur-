@@ -34,8 +34,10 @@ export interface UserSettings {
   dailyQuotaHours: number; // e.g. 8
   dailyQuotaMinutes: number; // e.g. 30 -> total 8h 30m
   isThursdayHoliday: boolean; // Friday is always holiday
-  departureReminderEnabled: boolean;
-  reminderMinutesBeforeQuota: number; // e.g. 0 (at quota) or 15
+  departureReminderEnabled?: boolean;
+  reminderMinutesBeforeQuota?: number;
+  entryReminderEnabled: boolean; // یادآوری ثبت ورود
+  entryReminderTime: string; // HH:mm e.g. "09:00"
   theme: 'light' | 'dark';
 }
 
@@ -59,6 +61,8 @@ export interface MonthCalculationResult {
   workDaysCount: number;
   dailyQuotaMinutes: number;
   D_minutes: number; // Total required minutes in work days
+  elapsedWorkDaysCount: number; // روزهای کاری موظفی سپری‌شده تا تاریخ جاری در این ماه
+  elapsedQuotaMinutes: number; // مجموع ساعات موظفی در روزهای کاری سپری‌شده تا تاریخ جاری
   P_minutes: number; // Recorded work on work days
   L_minutes: number; // Recorded leave minutes
   H_minutes: number; // Recorded work on holidays

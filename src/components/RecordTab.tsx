@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import {
   AlertCircle,
+  Bell,
   Calendar,
   CheckCircle2,
   ChevronLeft,
@@ -176,33 +177,16 @@ export const RecordTab: React.FC<RecordTabProps> = ({
   // Overtime today from chronological calculations
   const overtimeTodayMinutes = dayCalculations ? dayCalculations.overtimeMinutes : 0;
 
-  // Estimated departure time
-  let estimatedDepartureText = '-';
-  if (isWorkDay) {
-    if (remainingTodayMinutes <= 0) {
-      estimatedDepartureText = 'تکمیل شده';
-    } else if (openInterval) {
-      const openStartM = timeStringToMinutes(openInterval.startTime);
-      let closedWorkBefore = 0;
-      for (const i of dayIntervals) {
-        if (i.id !== openInterval.id && i.endTime !== null) {
-          closedWorkBefore += calculateIntervalMinutes(i.startTime, i.endTime);
-        }
-      }
-      const neededFromOpen = Math.max(
-        0,
-        dailyQuotaMinutes - closedWorkBefore - totalDayLeaveMinutes
-      );
-      const estDepartureMinutes = openStartM + neededFromOpen;
-      estimatedDepartureText = toPersianDigits(minutesToTimeString(estDepartureMinutes));
-    } else {
-      const estStartM = nowMinutes;
-      const estDepartureMinutes = estStartM + remainingTodayMinutes;
-      estimatedDepartureText = `حدود ${toPersianDigits(minutesToTimeString(estDepartureMinutes))}`;
-    }
-  } else {
-    estimatedDepartureText = 'روز تعطیل';
-  }
+  // Entry reminder banner check
+  const reminderMinutes = settings.entryReminderTime
+    ? timeStringToMinutes(settings.entryReminderTime)
+    : 9 * 60;
+  const showEntryReminderAlert =
+    isToday &&
+    settings.entryReminderEnabled &&
+    dayIntervals.length === 0 &&
+    isWorkDay &&
+    nowMinutes >= reminderMinutes;
 
   // Show transient feedback
   const showFeedback = (msg: string) => {
@@ -410,75 +394,88 @@ export const RecordTab: React.FC<RecordTabProps> = ({
         </div>
       </div>
 
-      {/* Summary Cards: 4 cards grid */}
-      <div className="grid grid-cols-2 gap-2.5">
+      {/* Entry Reminder Alert Banner if user hasn't registered entry yet */}
+      {showEntryReminderAlert && (
+        <div className="p-3.5 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 flex items-center justify-between gap-3 shadow-xs">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="p-2 rounded-xl bg-amber-500/15 text-amber-600 dark:text-amber-400 shrink-0">
+              <Bell className="w-4 h-4 animate-bounce" />
+            </div>
+            <div className="min-w-0">
+              <div className="font-bold text-xs text-amber-900 dark:text-amber-200">
+                یادآوری ثبت ورود
+              </div>
+              <div className="text-[11px] text-amber-700 dark:text-amber-400 truncate">
+                ساعت از {toPersianDigits(settings.entryReminderTime)} گذشته و هنوز ورود امروز ثبت نشده است.
+              </div>
+            </div>
+          </div>
+          <button
+            onClick={handlePrimaryClockIn}
+            className="px-3 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs shrink-0 active:scale-95 transition-all shadow-xs"
+          >
+            ثبت ورود الان
+          </button>
+        </div>
+      )}
+
+      {/* Summary Cards: 3 cards grid (بدون ساعت خروج تقریبی) */}
+      <div className="grid grid-cols-3 gap-2">
         {/* Card 1: Work done so far */}
-        <div className="p-3.5 rounded-2xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 shadow-xs relative overflow-hidden">
-          <div className="flex items-center justify-between mb-1.5">
-            <span className="text-xs font-semibold text-neutral-500 dark:text-neutral-400">
+        <div className="p-3 rounded-2xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 shadow-xs relative overflow-hidden">
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-[11px] font-semibold text-neutral-500 dark:text-neutral-400 truncate">
               کارکرد امروز
             </span>
-            <Clock className="w-4 h-4 text-neutral-400" />
+            <Clock className="w-3.5 h-3.5 text-neutral-400 shrink-0" />
           </div>
-          <div className="font-mono font-bold text-xl text-neutral-950 dark:text-neutral-50 tabular-nums">
+          <div className="font-mono font-bold text-base sm:text-lg text-neutral-950 dark:text-neutral-50 tabular-nums">
             {toPersianDigits(Math.floor(totalDayWorkMinutes / 60))}:
             {toPersianDigits(String(Math.floor(totalDayWorkMinutes % 60)).padStart(2, '0'))}
           </div>
-          {openInterval && isToday && (
-            <div className="text-[10px] text-neutral-600 dark:text-neutral-300 font-medium mt-1 flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-neutral-900 dark:bg-white animate-pulse" />
-              در حال ثبت زنده...
+          {openInterval && isToday ? (
+            <div className="text-[9px] text-neutral-600 dark:text-neutral-300 font-medium mt-1 flex items-center gap-1 truncate">
+              <span className="w-1.5 h-1.5 rounded-full bg-neutral-900 dark:bg-white animate-pulse shrink-0" />
+              در حال ثبت...
+            </div>
+          ) : (
+            <div className="text-[9px] text-neutral-400 mt-1 truncate">
+              مجموع بازه‌ها
             </div>
           )}
         </div>
 
         {/* Card 2: Remaining to Daily Quota */}
-        <div className="p-3.5 rounded-2xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 shadow-xs">
-          <div className="flex items-center justify-between mb-1.5">
-            <span className="text-xs font-semibold text-neutral-500 dark:text-neutral-400">
+        <div className="p-3 rounded-2xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 shadow-xs">
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-[11px] font-semibold text-neutral-500 dark:text-neutral-400 truncate">
               مانده تا موظفی
             </span>
-            <Hourglass className="w-4 h-4 text-neutral-400" />
+            <Hourglass className="w-3.5 h-3.5 text-neutral-400 shrink-0" />
           </div>
-          <div className="font-mono font-bold text-xl text-neutral-950 dark:text-neutral-50 tabular-nums">
+          <div className="font-mono font-bold text-base sm:text-lg text-neutral-950 dark:text-neutral-50 tabular-nums">
             {toPersianDigits(Math.floor(remainingTodayMinutes / 60))}:
             {toPersianDigits(String(remainingTodayMinutes % 60).padStart(2, '0'))}
           </div>
-          <div className="text-[10px] text-neutral-400 mt-1 truncate">
-            موظفی: {toPersianDigits(settings.dailyQuotaHours)}:{toPersianDigits(String(settings.dailyQuotaMinutes).padStart(2, '0'))}
+          <div className="text-[9px] text-neutral-400 mt-1 truncate">
+            {remainingTodayMinutes === 0 ? 'تکمیل شده' : `موظفی: ${toPersianDigits(settings.dailyQuotaHours)}:${toPersianDigits(String(settings.dailyQuotaMinutes).padStart(2, '0'))}`}
           </div>
         </div>
 
-        {/* Card 3: Estimated Departure */}
-        <div className="p-3.5 rounded-2xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 shadow-xs">
-          <div className="flex items-center justify-between mb-1.5">
-            <span className="text-xs font-semibold text-neutral-500 dark:text-neutral-400">
-              ساعت خروج تقریبی
-            </span>
-            <LogOut className="w-4 h-4 text-neutral-400" />
-          </div>
-          <div className="font-mono font-bold text-lg text-neutral-950 dark:text-neutral-50 truncate">
-            {estimatedDepartureText}
-          </div>
-          <div className="text-[10px] text-neutral-400 mt-1">
-            {openInterval ? 'بر اساس بازه فعال' : 'تکمیل موظفی'}
-          </div>
-        </div>
-
-        {/* Card 4: Overtime Today */}
-        <div className="p-3.5 rounded-2xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 shadow-xs">
-          <div className="flex items-center justify-between mb-1.5">
-            <span className="text-xs font-semibold text-neutral-500 dark:text-neutral-400">
+        {/* Card 3: Overtime Today */}
+        <div className="p-3 rounded-2xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 shadow-xs">
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-[11px] font-semibold text-neutral-500 dark:text-neutral-400 truncate">
               اضافه‌کار امروز
             </span>
-            <Plus className="w-4 h-4 text-neutral-400" />
+            <Plus className="w-3.5 h-3.5 text-neutral-400 shrink-0" />
           </div>
-          <div className="font-mono font-bold text-xl text-neutral-950 dark:text-neutral-50 tabular-nums">
+          <div className="font-mono font-bold text-base sm:text-lg text-neutral-950 dark:text-neutral-50 tabular-nums">
             {toPersianDigits(Math.floor(overtimeTodayMinutes / 60))}:
             {toPersianDigits(String(overtimeTodayMinutes % 60).padStart(2, '0'))}
           </div>
-          <div className="text-[10px] text-neutral-400 mt-1">
-            {!isWorkDay ? 'کار در روز تعطیل' : 'مازاد بر موظفی'}
+          <div className="text-[9px] text-neutral-400 mt-1 truncate">
+            {!isWorkDay ? 'کار روز تعطیل' : 'مازاد موظفی'}
           </div>
         </div>
       </div>

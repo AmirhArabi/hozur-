@@ -135,6 +135,8 @@ export const DEFAULT_SETTINGS: UserSettings = {
   isThursdayHoliday: false, // Friday is always holiday
   departureReminderEnabled: false,
   reminderMinutesBeforeQuota: 0,
+  entryReminderEnabled: false,
+  entryReminderTime: '09:00',
   theme: 'dark'
 };
 
@@ -274,11 +276,21 @@ export function calculateMonthStats(params: {
   }
 
   let workDaysCount = 0;
+  let elapsedWorkDaysCount = 0;
   let P_minutes = 0; // work minutes on normal work days
   let L_minutes = 0; // leave minutes
   let H_minutes = 0; // work minutes on holidays
   let daysWithWorkCount = 0;
   let daysWithLeaveCount = 0;
+
+  let parsedCurrentDate: { year: number; month: number; day: number } | null = null;
+  if (currentDateStr) {
+    try {
+      parsedCurrentDate = parseJalaliDate(currentDateStr);
+    } catch {
+      parsedCurrentDate = null;
+    }
+  }
 
   // First pass: identify work days, calculate daily work and leave totals
   interface TempDayData {
@@ -303,6 +315,28 @@ export function calculateMonthStats(params: {
 
     if (isWorkDay) {
       workDaysCount += 1;
+
+      let isElapsed = false;
+      if (!parsedCurrentDate) {
+        isElapsed = true;
+      } else if (
+        year < parsedCurrentDate.year ||
+        (year === parsedCurrentDate.year && month < parsedCurrentDate.month)
+      ) {
+        isElapsed = true;
+      } else if (
+        year === parsedCurrentDate.year &&
+        month === parsedCurrentDate.month &&
+        day <= parsedCurrentDate.day
+      ) {
+        isElapsed = true;
+      } else {
+        isElapsed = false;
+      }
+
+      if (isElapsed) {
+        elapsedWorkDaysCount += 1;
+      }
     }
 
     // Work minutes on this day
@@ -357,6 +391,7 @@ export function calculateMonthStats(params: {
 
   // Monthly totals
   const D_minutes = workDaysCount * dailyQuotaMinutes;
+  const elapsedQuotaMinutes = elapsedWorkDaysCount * dailyQuotaMinutes;
   const remainingMinutes = Math.max(0, D_minutes - P_minutes - L_minutes);
   const normalOvertimeMinutes = Math.max(0, P_minutes - D_minutes);
   const totalOvertimeMinutes = normalOvertimeMinutes + H_minutes;
@@ -413,6 +448,8 @@ export function calculateMonthStats(params: {
     workDaysCount,
     dailyQuotaMinutes,
     D_minutes,
+    elapsedWorkDaysCount,
+    elapsedQuotaMinutes,
     P_minutes,
     L_minutes,
     H_minutes,

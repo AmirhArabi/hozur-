@@ -189,3 +189,30 @@ test('Under-hours deficit calculation (> 15 minutes threshold)', () => {
   const deficit3 = dailyQuotaMinutes - worked3;
   assert.equal(deficit3 <= 0, true);
 });
+
+test('calculateMonthStats elapsedWorkDaysCount and elapsedQuotaMinutes calculation', () => {
+  const testSettings = {
+    ...DEFAULT_SETTINGS,
+    dailyQuotaHours: 8,
+    dailyQuotaMinutes: 30, // 510 min
+    isThursdayHoliday: false
+  };
+
+  // If currentDateStr is 1404/07/10 (10th of Mehr 1404)
+  const result = calculateMonthStats({
+    year: 1404,
+    month: 7,
+    intervals: [],
+    leaves: [],
+    holidays: DEFAULT_FIXED_HOLIDAYS,
+    settings: testSettings,
+    currentDateStr: '1404/07/10'
+  });
+
+  assert.ok(result.elapsedWorkDaysCount > 0 && result.elapsedWorkDaysCount <= 10);
+  assert.equal(
+    result.elapsedQuotaMinutes,
+    result.elapsedWorkDaysCount * 510,
+    'elapsedQuotaMinutes must equal elapsedWorkDaysCount * dailyQuotaMinutes'
+  );
+});
