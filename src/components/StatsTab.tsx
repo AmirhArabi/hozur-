@@ -8,10 +8,12 @@ import {
   Clock,
   Coffee,
   FileSpreadsheet,
+  FileText,
   Flag,
   Hourglass,
   Layers,
   PlusCircle,
+  Printer,
   RotateCcw
 } from 'lucide-react';
 import {
@@ -34,6 +36,7 @@ import {
 } from '../utils/jalali';
 import { DayDetailsModal } from './DayDetailsModal';
 import { ExcelTableModal } from './ExcelTableModal';
+import { PdfReportModal } from './PdfReportModal';
 import { ExportService } from '../services/export';
 
 interface StatsTabProps {
@@ -63,6 +66,7 @@ export const StatsTab: React.FC<StatsTabProps> = ({
   const [isExportingCSV, setIsExportingCSV] = useState(false);
   const [selectedWeekdayIndex, setSelectedWeekdayIndex] = useState<number | null>(null);
   const [isExcelTableOpen, setIsExcelTableOpen] = useState(false);
+  const [isPdfModalOpen, setIsPdfModalOpen] = useState(false);
 
   const today = getCurrentJalaliDate();
   const todayStr = formatJalaliDate(today.year, today.month, today.day);
@@ -251,17 +255,28 @@ export const StatsTab: React.FC<StatsTabProps> = ({
 
       {/* 7 Metric Cards */}
       <div className="space-y-2.5">
-        <div className="flex items-center justify-between px-1">
+        <div className="flex items-center justify-between px-1 flex-wrap gap-2">
           <span className="text-xs font-bold text-neutral-700 dark:text-neutral-300">
             خلاصه آمار ماه
           </span>
-          <button
-            onClick={() => setIsExcelTableOpen(true)}
-            className="text-xs font-semibold text-neutral-800 dark:text-neutral-200 flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-neutral-100 dark:bg-neutral-800 hover:bg-neutral-200 dark:hover:bg-neutral-700 active:scale-95 transition-all shadow-2xs border border-neutral-200/60 dark:border-neutral-700/60"
-          >
-            <FileSpreadsheet className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-            جدول و خروجی اکسل
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setIsPdfModalOpen(true)}
+              className="text-xs font-semibold text-neutral-800 dark:text-neutral-200 flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/50 active:scale-95 transition-all shadow-2xs border border-blue-200/80 dark:border-blue-800/80"
+              title="چاپ یا ذخیره گزارش ماهانه به صورت فایل PDF منظم"
+            >
+              <Printer className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+              <span>چاپ / خروجی PDF</span>
+            </button>
+
+            <button
+              onClick={() => setIsExcelTableOpen(true)}
+              className="text-xs font-semibold text-neutral-800 dark:text-neutral-200 flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-neutral-100 dark:bg-neutral-800 hover:bg-neutral-200 dark:hover:bg-neutral-700 active:scale-95 transition-all shadow-2xs border border-neutral-200/60 dark:border-neutral-700/60"
+            >
+              <FileSpreadsheet className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+              <span>جدول و خروجی اکسل</span>
+            </button>
+          </div>
         </div>
 
         {/* 6 Primary Cards in requested 2x3 layout */}
@@ -748,6 +763,16 @@ export const StatsTab: React.FC<StatsTabProps> = ({
         monthStats={monthStats}
         intervals={intervals}
         leaves={leaves}
+      />
+
+      {/* PDF Report Print & Save Modal */}
+      <PdfReportModal
+        isOpen={isPdfModalOpen}
+        onClose={() => setIsPdfModalOpen(false)}
+        monthStats={monthStats}
+        intervals={intervals}
+        leaves={leaves}
+        settings={settings}
       />
     </div>
   );

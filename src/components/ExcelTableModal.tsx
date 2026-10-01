@@ -1,5 +1,5 @@
 import React from 'react';
-import { Download, FileSpreadsheet, X } from 'lucide-react';
+import { Download, FileSpreadsheet, Printer, X } from 'lucide-react';
 import { LeaveRecord, MonthCalculationResult, WorkInterval } from '../types';
 import {
   formatMinutesToPersianHM,
@@ -8,6 +8,7 @@ import {
   toPersianDigits
 } from '../utils/jalali';
 import { ExportService } from '../services/export';
+import { PdfReportService } from '../services/pdfReport';
 
 interface ExcelTableModalProps {
   isOpen: boolean;
@@ -81,13 +82,21 @@ export const ExcelTableModal: React.FC<ExcelTableModalProps> = ({
 
           <div className="flex items-center gap-2">
             <button
+              onClick={() => PdfReportService.printReport(monthStats, intervals, leaves)}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 active:scale-95 text-white font-semibold text-xs transition-all shadow-xs"
+              title="چاپ یا ذخیره گزارش به عنوان فایل PDF"
+            >
+              <Printer className="w-3.5 h-3.5" />
+              <span>چاپ / PDF</span>
+            </button>
+            <button
               onClick={handleDownloadXLS}
               disabled={isExporting}
               className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-semibold text-xs transition-all shadow-xs disabled:opacity-50"
               title="خروجی فایل اکسل با ظاهر و استایل‌های کامل جدول"
             >
               <Download className="w-3.5 h-3.5" />
-              <span>{isExporting ? 'در حال خروجی...' : 'دانلود اکسل (استایل‌دار)'}</span>
+              <span>{isExporting ? 'در حال خروجی...' : 'دانلود اکسل'}</span>
             </button>
             <button
               onClick={handleDownloadCSV}
