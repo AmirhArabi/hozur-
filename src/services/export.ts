@@ -83,15 +83,18 @@ export const ExportService = {
       leavesByDate.set(item.date, list);
     }
 
+    const totalOvertime = monthStats.totalOvertime ?? monthStats.totalOvertimeMinutes ?? 0;
+
     // Include UTF-8 BOM for Persian text rendering in Excel
     let csv = '\uFEFF';
     csv += `گزارش کارکرد ماه ${monthName} سال ${toPersianDigits(monthStats.year)}\n`;
-    csv += `مجموع کارکرد,${formatMinutesToPersianHM(monthStats.totalWorkMinutes)},ساعات موظفی,${formatMinutesToPersianHM(monthStats.D_minutes)},مانده موظفی,${formatMinutesToPersianHM(monthStats.remainingMinutes)},اضافه‌کار کل,${formatMinutesToPersianHM(monthStats.totalOvertimeMinutes)}\n\n`;
+    csv += `ساعات کاری,${formatMinutesToPersianHM(monthStats.totalWorkMinutes)},ساعات موظفی,${formatMinutesToPersianHM(monthStats.D_minutes)},مانده موظفی,${formatMinutesToPersianHM(monthStats.remainingMinutes)},اضافه‌کار کل,${formatMinutesToPersianHM(totalOvertime)}\n\n`;
 
-    csv += 'تاریخ,روز هفته,وضعیت روز,بازه‌های کاری,مرخصی,کارکرد (دقیقه),کارکرد,اضافه‌کار روز (دقیقه),اضافه‌کار روز\n';
+    csv += 'ردیف,تاریخ,روز هفته,وضعیت روز,بازه‌های کاری,مرخصی,کارکرد (دقیقه),ساعت کارکرد,اضافه کار (دقیقه),ساعت اضافه کار\n';
 
     const sortedDates = Object.keys(monthStats.dailyBreakdown).sort();
 
+    let rowIndex = 1;
     for (const dateStr of sortedDates) {
       const day = monthStats.dailyBreakdown[dateStr];
       const weekdayName = PERSIAN_WEEKDAYS[day.dayOfWeekIndex];
@@ -118,6 +121,7 @@ export const ExportService = {
       const leavesCell = leaveStrs.length > 0 ? `"${leaveStrs.join(' | ')}"` : '-';
 
       csv += [
+        rowIndex,
         toPersianDigits(dateStr),
         weekdayName,
         `"${status}"`,
@@ -128,7 +132,23 @@ export const ExportService = {
         day.overtimeMinutes,
         `"${formatMinutesToPersianHM(day.overtimeMinutes)}"`
       ].join(',') + '\n';
+
+      rowIndex += 1;
     }
+
+    // Totals row at the bottom
+    csv += [
+      'مجموع کل',
+      '',
+      '',
+      '',
+      '',
+      '',
+      monthStats.totalWorkMinutes,
+      `"${formatMinutesToPersianHM(monthStats.totalWorkMinutes)}"`,
+      totalOvertime,
+      `"${formatMinutesToPersianHM(totalOvertime)}"`
+    ].join(',') + '\n';
 
     return csv;
   },

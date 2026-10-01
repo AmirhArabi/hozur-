@@ -167,17 +167,18 @@ export const RecordTab: React.FC<RecordTabProps> = ({
   const dayCalculations = monthStats.dailyBreakdown[selectedDate];
   const isWorkDay = dayCalculations ? dayCalculations.isWorkDay : true;
 
-  // Remaining to daily quota:
+  // Remaining to daily quota (rounded to integer minutes to avoid floating-point seconds):
   const targetDailyQuota = isWorkDay ? dailyQuotaMinutes : 0;
   const remainingTodayMinutes = Math.max(
     0,
-    targetDailyQuota - totalDayWorkMinutes - totalDayLeaveMinutes
+    Math.round(targetDailyQuota - totalDayWorkMinutes - totalDayLeaveMinutes)
   );
 
-  // Overtime today calculation (live and accurate for selected date)
-  const overtimeTodayMinutes = !isWorkDay
-    ? totalDayWorkMinutes
-    : Math.max(0, totalDayWorkMinutes - targetDailyQuota);
+  // Overtime today calculation (live and accurate for selected date, integer minutes)
+  const overtimeTodayMinutes = Math.max(
+    0,
+    Math.round(!isWorkDay ? totalDayWorkMinutes : totalDayWorkMinutes - targetDailyQuota)
+  );
 
   // Entry reminder banner check
   const reminderMinutes = settings.entryReminderTime
@@ -457,7 +458,7 @@ export const RecordTab: React.FC<RecordTabProps> = ({
           </div>
           <div className="font-mono font-bold text-base sm:text-lg text-neutral-950 dark:text-neutral-50 tabular-nums">
             {toPersianDigits(Math.floor(remainingTodayMinutes / 60))}:
-            {toPersianDigits(String(remainingTodayMinutes % 60).padStart(2, '0'))}
+            {toPersianDigits(String(Math.floor(remainingTodayMinutes % 60)).padStart(2, '0'))}
           </div>
           <div className="text-[9px] text-neutral-400 mt-1 truncate">
             {remainingTodayMinutes === 0 ? 'تکمیل شده' : `موظفی: ${toPersianDigits(settings.dailyQuotaHours)}:${toPersianDigits(String(settings.dailyQuotaMinutes).padStart(2, '0'))}`}
@@ -474,7 +475,7 @@ export const RecordTab: React.FC<RecordTabProps> = ({
           </div>
           <div className="font-mono font-bold text-base sm:text-lg text-neutral-950 dark:text-neutral-50 tabular-nums">
             {toPersianDigits(Math.floor(overtimeTodayMinutes / 60))}:
-            {toPersianDigits(String(overtimeTodayMinutes % 60).padStart(2, '0'))}
+            {toPersianDigits(String(Math.floor(overtimeTodayMinutes % 60)).padStart(2, '0'))}
           </div>
           <div className="text-[9px] text-neutral-400 mt-1 truncate">
             {!isWorkDay ? 'کار روز تعطیل' : 'مازاد موظفی'}

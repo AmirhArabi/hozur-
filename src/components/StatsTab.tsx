@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import {
   BarChart3,
   Calendar as CalendarIcon,
+  CheckCircle2,
   ChevronLeft,
   ChevronRight,
   Clock,
@@ -32,6 +33,7 @@ import {
   toPersianDigits
 } from '../utils/jalali';
 import { DayDetailsModal } from './DayDetailsModal';
+import { ExcelTableModal } from './ExcelTableModal';
 import { ExportService } from '../services/export';
 
 interface StatsTabProps {
@@ -60,6 +62,7 @@ export const StatsTab: React.FC<StatsTabProps> = ({
   const [selectedDayResult, setSelectedDayResult] = useState<DayCalculationResult | null>(null);
   const [isExportingCSV, setIsExportingCSV] = useState(false);
   const [selectedWeekdayIndex, setSelectedWeekdayIndex] = useState<number | null>(null);
+  const [isExcelTableOpen, setIsExcelTableOpen] = useState(false);
 
   const today = getCurrentJalaliDate();
   const todayStr = formatJalaliDate(today.year, today.month, today.day);
@@ -187,6 +190,10 @@ export const StatsTab: React.FC<StatsTabProps> = ({
   const calculatedNormalOvertime = monthStats?.normalOvertimeMinutes ?? 0;
   const calculatedHolidayOvertime = monthStats?.H_minutes ?? 0;
 
+  // مجموع کارکرد (جمع ساعات کاری بعلاوه مجموع ساعات مرخصی)
+  const totalWorkAndLeaveMinutes = (monthStats?.totalWorkMinutes ?? 0) + (monthStats?.L_minutes ?? 0);
+  const quotaProgressPct = monthStats?.D_minutes > 0 ? Math.min(100, Math.round((totalWorkAndLeaveMinutes / monthStats.D_minutes) * 100)) : 100;
+
   return (
     <div className="space-y-4 pb-20 pt-2 animate-in fade-in duration-200">
       {/* Month Navigator Header */}
@@ -238,22 +245,21 @@ export const StatsTab: React.FC<StatsTabProps> = ({
             خلاصه آمار ماه
           </span>
           <button
-            onClick={handleExportMonthCSV}
-            disabled={isExportingCSV}
-            className="text-xs font-semibold text-neutral-800 dark:text-neutral-200 flex items-center gap-1 px-2.5 py-1 rounded-lg bg-neutral-100 dark:bg-neutral-800 hover:bg-neutral-200 dark:hover:bg-neutral-700 active:scale-95 transition-all"
+            onClick={() => setIsExcelTableOpen(true)}
+            className="text-xs font-semibold text-neutral-800 dark:text-neutral-200 flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-neutral-100 dark:bg-neutral-800 hover:bg-neutral-200 dark:hover:bg-neutral-700 active:scale-95 transition-all shadow-2xs border border-neutral-200/60 dark:border-neutral-700/60"
           >
-            <FileSpreadsheet className="w-3.5 h-3.5" />
-            خروجی اکسل (CSV)
+            <FileSpreadsheet className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+            جدول و خروجی اکسل
           </button>
         </div>
 
-        {/* Top 2 Primary Cards */}
+        {/* 6 Primary Cards in requested 2x3 layout */}
         <div className="grid grid-cols-2 gap-2.5">
-          {/* Card 1: Total Work Hours (P + H) */}
+          {/* Row 1, Col 1: ساعات کاری */}
           <div className="p-3.5 rounded-2xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 shadow-xs">
             <div className="flex items-center justify-between mb-1.5">
               <span className="text-xs font-semibold text-neutral-500 dark:text-neutral-400">
-                مجموع ساعات کاری
+                ساعات کاری
               </span>
               <Clock className="w-4 h-4 text-neutral-400" />
             </div>
@@ -266,11 +272,11 @@ export const StatsTab: React.FC<StatsTabProps> = ({
             </div>
           </div>
 
-          {/* Card 2: Overtime Total */}
+          {/* Row 1, Col 2: ساعات اضافه کار */}
           <div className="p-3.5 rounded-2xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 shadow-xs">
             <div className="flex items-center justify-between mb-1.5">
               <span className="text-xs font-semibold text-neutral-500 dark:text-neutral-400">
-                مجموع اضافه‌کار
+                ساعات اضافه کار
               </span>
               <PlusCircle className="w-4 h-4 text-neutral-400" />
             </div>
@@ -282,11 +288,101 @@ export const StatsTab: React.FC<StatsTabProps> = ({
               {formatHMPersian(calculatedHolidayOvertime)}
             </div>
           </div>
+
+          {/* Row 2, Col 1: ساعات موظفی کل ماه */}
+          <div className="p-3.5 rounded-2xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 shadow-xs">
+            <div className="flex items-center justify-between mb-1.5">
+              <span className="text-xs font-semibold text-neutral-500 dark:text-neutral-400">
+                ساعات موظفی کل ماه
+              </span>
+              <CalendarIcon className="w-4 h-4 text-neutral-400" />
+            </div>
+            <div className="font-mono font-bold text-2xl text-neutral-950 dark:text-neutral-50 tabular-nums">
+              {formatHMPersian(monthStats.D_minutes)}
+            </div>
+            <div className="text-[10px] text-neutral-400 mt-1 truncate">
+              {toPersianDigits(monthStats.workDaysCount)} روز کاری کل ماه
+            </div>
+          </div>
+
+          {/* Row 2, Col 2: موظفی تا امروز */}
+          <div className="p-3.5 rounded-2xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 shadow-xs">
+            <div className="flex items-center justify-between mb-1.5">
+              <span className="text-xs font-semibold text-neutral-500 dark:text-neutral-400 truncate">
+                موظفی تا امروز
+              </span>
+              <Hourglass className="w-4 h-4 text-neutral-400" />
+            </div>
+            <div className="font-mono font-bold text-2xl text-neutral-950 dark:text-neutral-50 tabular-nums">
+              {formatHMPersian(monthStats.elapsedQuotaMinutes)}
+            </div>
+            <div className="text-[10px] text-neutral-400 mt-1 truncate">
+              {toPersianDigits(monthStats.elapsedWorkDaysCount)} روز کاری {isCurrentMonth ? 'تا امروز' : 'ماه'}
+            </div>
+          </div>
+
+          {/* Row 3, Col 1: کارکرد تا امروز */}
+          <div className="p-3.5 rounded-2xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 shadow-xs">
+            <div className="flex items-center justify-between mb-1.5">
+              <span className="text-xs font-semibold text-neutral-500 dark:text-neutral-400">
+                کارکرد تا امروز
+              </span>
+              <Layers className="w-4 h-4 text-neutral-400" />
+            </div>
+            <div className="font-mono font-bold text-2xl text-neutral-950 dark:text-neutral-50 tabular-nums">
+              {formatHMPersian(totalWorkAndLeaveMinutes)}
+            </div>
+            <div className="text-[10px] text-neutral-400 mt-1 truncate">
+              کاری: {formatHMPersian(monthStats.totalWorkMinutes)} + مرخصی: {formatHMPersian(monthStats.L_minutes)}
+            </div>
+          </div>
+
+          {/* Row 3, Col 2: ساعات مانده تا موظفی */}
+          <div className="p-3.5 rounded-2xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 shadow-xs">
+            <div className="flex items-center justify-between mb-1.5">
+              <span className="text-xs font-semibold text-neutral-500 dark:text-neutral-400">
+                ساعات مانده تا موظفی
+              </span>
+              <CheckCircle2 className="w-4 h-4 text-neutral-400" />
+            </div>
+            <div className="font-mono font-bold text-2xl text-neutral-950 dark:text-neutral-50 tabular-nums">
+              {formatHMPersian(monthStats.remainingMinutes)}
+            </div>
+            <div className="text-[10px] text-neutral-400 mt-1 truncate">
+              {monthStats.remainingMinutes === 0 ? 'موظفی تکمیل شده' : 'مانده از موظفی کل ماه'}
+            </div>
+          </div>
         </div>
 
-        {/* 6 Secondary Cards Grid */}
+        {/* Secondary Informative Cards */}
         <div className="grid grid-cols-2 gap-2.5">
-          {/* Card 3: Days with Work */}
+          {/* Card: ساعات مرخصی */}
+          <div className="p-3 rounded-2xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 shadow-xs">
+            <span className="text-[11px] font-semibold text-neutral-500 block mb-1">
+              ساعات مرخصی
+            </span>
+            <div className="font-mono font-bold text-lg text-neutral-900 dark:text-neutral-100 tabular-nums">
+              {formatHMPersian(monthStats.L_minutes)}
+            </div>
+            <div className="text-[10px] text-neutral-400">
+              استحقاقی / ساعتی
+            </div>
+          </div>
+
+          {/* Card: روزهای دارای مرخصی */}
+          <div className="p-3 rounded-2xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 shadow-xs">
+            <span className="text-[11px] font-semibold text-neutral-500 block mb-1">
+              روزهای دارای مرخصی
+            </span>
+            <div className="font-bold text-lg text-neutral-900 dark:text-neutral-100">
+              {toPersianDigits(monthStats.daysWithLeaveCount)} روز
+            </div>
+            <div className="text-[10px] text-neutral-400">
+              ثبت‌شده در این ماه
+            </div>
+          </div>
+
+          {/* Card: روزهای دارای ساعت کاری */}
           <div className="p-3 rounded-2xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 shadow-xs">
             <span className="text-[11px] font-semibold text-neutral-500 block mb-1">
               روزهای دارای ساعت کاری
@@ -299,68 +395,16 @@ export const StatsTab: React.FC<StatsTabProps> = ({
             </div>
           </div>
 
-          {/* Card 4: Total Required Hours (D) for full month */}
+          {/* Card: تحقق موظفی کل ماه */}
           <div className="p-3 rounded-2xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 shadow-xs">
             <span className="text-[11px] font-semibold text-neutral-500 block mb-1">
-              مجموع موظفی کل ماه
-            </span>
-            <div className="font-mono font-bold text-lg text-neutral-900 dark:text-neutral-100 tabular-nums">
-              {formatHMPersian(monthStats.D_minutes)}
-            </div>
-            <div className="text-[10px] text-neutral-400 truncate">
-              {toPersianDigits(monthStats.workDaysCount)} روز کاری کل ماه
-            </div>
-          </div>
-
-          {/* Card 5: Elapsed Workdays Required Hours (درخواست جدید کاربر) */}
-          <div className="p-3 rounded-2xl bg-white dark:bg-neutral-900 border-2 border-neutral-300 dark:border-neutral-700 shadow-xs relative">
-            <span className="text-[11px] font-bold text-neutral-800 dark:text-neutral-200 block mb-1">
-              موظفی روزهای سپری‌شده
-            </span>
-            <div className="font-mono font-bold text-lg text-neutral-950 dark:text-neutral-50 tabular-nums">
-              {formatHMPersian(monthStats.elapsedQuotaMinutes)}
-            </div>
-            <div className="text-[10px] text-neutral-500 dark:text-neutral-400 truncate">
-              {toPersianDigits(monthStats.elapsedWorkDaysCount)} روز کاری {isCurrentMonth ? 'تا امروز' : 'ماه'}
-            </div>
-          </div>
-
-          {/* Card 6: Remaining to Quota */}
-          <div className="p-3 rounded-2xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 shadow-xs">
-            <span className="text-[11px] font-semibold text-neutral-500 block mb-1">
-              ساعات مانده تا موظفی
-            </span>
-            <div className="font-mono font-bold text-lg text-neutral-900 dark:text-neutral-100 tabular-nums">
-              {formatHMPersian(monthStats.remainingMinutes)}
-            </div>
-            <div className="text-[10px] text-neutral-400 truncate">
-              {monthStats.remainingMinutes === 0 ? 'موظفی تکمیل شده' : 'مانده از کل موظفی'}
-            </div>
-          </div>
-
-          {/* Card 7: Total Leave Hours (L) */}
-          <div className="p-3 rounded-2xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 shadow-xs">
-            <span className="text-[11px] font-semibold text-neutral-500 block mb-1">
-              مجموع ساعات مرخصی
-            </span>
-            <div className="font-mono font-bold text-lg text-neutral-900 dark:text-neutral-100 tabular-nums">
-              {formatHMPersian(monthStats.L_minutes)}
-            </div>
-            <div className="text-[10px] text-neutral-400">
-              استحقاقی / ساعتی
-            </div>
-          </div>
-
-          {/* Card 8: Days with Leave */}
-          <div className="p-3 rounded-2xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 shadow-xs">
-            <span className="text-[11px] font-semibold text-neutral-500 block mb-1">
-              روزهای دارای مرخصی
+              تحقق موظفی کل ماه
             </span>
             <div className="font-bold text-lg text-neutral-900 dark:text-neutral-100">
-              {toPersianDigits(monthStats.daysWithLeaveCount)} روز
+              {toPersianDigits(quotaProgressPct)}٪
             </div>
-            <div className="text-[10px] text-neutral-400">
-              ثبت‌شده در این ماه
+            <div className="text-[10px] text-neutral-400 truncate">
+              کارکرد از کل موظفی
             </div>
           </div>
         </div>
@@ -682,6 +726,15 @@ export const StatsTab: React.FC<StatsTabProps> = ({
         intervals={intervals}
         leaves={leaves}
         onGoToRecordDate={onGoToRecordDate}
+      />
+
+      {/* Excel Table Report Modal */}
+      <ExcelTableModal
+        isOpen={isExcelTableOpen}
+        onClose={() => setIsExcelTableOpen(false)}
+        monthStats={monthStats}
+        intervals={intervals}
+        leaves={leaves}
       />
     </div>
   );
