@@ -180,19 +180,30 @@ export const StatsTab: React.FC<StatsTabProps> = ({
   const weeklyHolidaysCount = monthHolidays.filter((h) => !h.isOfficial).length;
 
   const formatHMPersian = (totalMinutes: number) => {
-    const h = Math.floor(totalMinutes / 60);
-    const m = Math.floor(totalMinutes % 60);
+    const rounded = Math.round(totalMinutes || 0);
+    const h = Math.floor(rounded / 60);
+    const m = Math.abs(rounded % 60);
     return `${toPersianDigits(h)}:${toPersianDigits(String(m).padStart(2, '0'))}`;
   };
 
+  // Helper to format decimal hours with max 1 decimal place (e.g. "7.5" or "8")
+  const formatDecimalHours = (totalMinutes: number) => {
+    const rounded = Math.round(totalMinutes || 0);
+    const hours = rounded / 60;
+    const formatted = hours % 1 === 0 ? hours.toFixed(0) : hours.toFixed(1);
+    return toPersianDigits(formatted);
+  };
+
   // Ensure calculated overtime is cleanly extracted from monthStats
-  const calculatedTotalOvertime = monthStats?.totalOvertime ?? monthStats?.totalOvertimeMinutes ?? 0;
-  const calculatedNormalOvertime = monthStats?.normalOvertimeMinutes ?? 0;
-  const calculatedHolidayOvertime = monthStats?.H_minutes ?? 0;
+  const calculatedTotalOvertime = Math.round(monthStats?.totalOvertime ?? monthStats?.totalOvertimeMinutes ?? 0);
+  const calculatedNormalOvertime = Math.round(monthStats?.normalOvertimeMinutes ?? 0);
+  const calculatedHolidayOvertime = Math.round(monthStats?.H_minutes ?? 0);
 
   // مجموع کارکرد (جمع ساعات کاری بعلاوه مجموع ساعات مرخصی)
-  const totalWorkAndLeaveMinutes = (monthStats?.totalWorkMinutes ?? 0) + (monthStats?.L_minutes ?? 0);
-  const quotaProgressPct = monthStats?.D_minutes > 0 ? Math.min(100, Math.round((totalWorkAndLeaveMinutes / monthStats.D_minutes) * 100)) : 100;
+  const totalWorkAndLeaveMinutes = Math.round((monthStats?.totalWorkMinutes ?? 0) + (monthStats?.L_minutes ?? 0));
+  const rawProgress = monthStats?.D_minutes > 0 ? (totalWorkAndLeaveMinutes / monthStats.D_minutes) * 100 : 100;
+  const quotaProgressPct = Math.min(100, Number(rawProgress.toFixed(1)));
+  const quotaProgressFormatted = toPersianDigits(quotaProgressPct % 1 === 0 ? quotaProgressPct.toFixed(0) : quotaProgressPct.toFixed(1));
 
   return (
     <div className="space-y-4 pb-20 pt-2 animate-in fade-in duration-200">
@@ -268,7 +279,7 @@ export const StatsTab: React.FC<StatsTabProps> = ({
             </div>
             <div className="text-[10px] text-neutral-400 mt-1">
               عادی: {formatHMPersian(monthStats.P_minutes)} | تعطیل:{' '}
-              {formatHMPersian(monthStats.H_minutes)}
+              {formatHMPersian(monthStats.H_minutes)} ({formatDecimalHours(monthStats.totalWorkMinutes)} ساعت)
             </div>
           </div>
 
@@ -285,7 +296,7 @@ export const StatsTab: React.FC<StatsTabProps> = ({
             </div>
             <div className="text-[10px] text-neutral-400 mt-1">
               عادی: {formatHMPersian(calculatedNormalOvertime)} | تعطیل:{' '}
-              {formatHMPersian(calculatedHolidayOvertime)}
+              {formatHMPersian(calculatedHolidayOvertime)} ({formatDecimalHours(calculatedTotalOvertime)} ساعت)
             </div>
           </div>
 
@@ -301,7 +312,7 @@ export const StatsTab: React.FC<StatsTabProps> = ({
               {formatHMPersian(monthStats.D_minutes)}
             </div>
             <div className="text-[10px] text-neutral-400 mt-1 truncate">
-              {toPersianDigits(monthStats.workDaysCount)} روز کاری کل ماه
+              {toPersianDigits(monthStats.workDaysCount)} روز کاری ({formatDecimalHours(monthStats.D_minutes)} ساعت)
             </div>
           </div>
 
@@ -317,7 +328,7 @@ export const StatsTab: React.FC<StatsTabProps> = ({
               {formatHMPersian(monthStats.elapsedQuotaMinutes)}
             </div>
             <div className="text-[10px] text-neutral-400 mt-1 truncate">
-              {toPersianDigits(monthStats.elapsedWorkDaysCount)} روز کاری {isCurrentMonth ? 'تا امروز' : 'ماه'}
+              {toPersianDigits(monthStats.elapsedWorkDaysCount)} روز کاری {isCurrentMonth ? 'تا امروز' : 'ماه'} ({formatDecimalHours(monthStats.elapsedQuotaMinutes)} ساعت)
             </div>
           </div>
 
@@ -333,7 +344,7 @@ export const StatsTab: React.FC<StatsTabProps> = ({
               {formatHMPersian(totalWorkAndLeaveMinutes)}
             </div>
             <div className="text-[10px] text-neutral-400 mt-1 truncate">
-              کاری: {formatHMPersian(monthStats.totalWorkMinutes)} + مرخصی: {formatHMPersian(monthStats.L_minutes)}
+              کاری: {formatHMPersian(monthStats.totalWorkMinutes)} + مرخصی: {formatHMPersian(monthStats.L_minutes)} ({formatDecimalHours(totalWorkAndLeaveMinutes)} ساعت)
             </div>
           </div>
 
@@ -349,7 +360,9 @@ export const StatsTab: React.FC<StatsTabProps> = ({
               {formatHMPersian(monthStats.remainingMinutes)}
             </div>
             <div className="text-[10px] text-neutral-400 mt-1 truncate">
-              {monthStats.remainingMinutes === 0 ? 'موظفی تکمیل شده' : 'مانده از موظفی کل ماه'}
+              {monthStats.remainingMinutes === 0
+                ? 'موظفی تکمیل شده'
+                : `${formatDecimalHours(monthStats.remainingMinutes)} ساعت مانده از کل موظفی`}
             </div>
           </div>
         </div>
@@ -365,7 +378,7 @@ export const StatsTab: React.FC<StatsTabProps> = ({
               {formatHMPersian(monthStats.L_minutes)}
             </div>
             <div className="text-[10px] text-neutral-400">
-              استحقاقی / ساعتی
+              استحقاقی / ساعتی ({formatDecimalHours(monthStats.L_minutes)} ساعت)
             </div>
           </div>
 
@@ -401,7 +414,7 @@ export const StatsTab: React.FC<StatsTabProps> = ({
               تحقق موظفی کل ماه
             </span>
             <div className="font-bold text-lg text-neutral-900 dark:text-neutral-100">
-              {toPersianDigits(quotaProgressPct)}٪
+              {quotaProgressFormatted}٪
             </div>
             <div className="text-[10px] text-neutral-400 truncate">
               کارکرد از کل موظفی
@@ -433,7 +446,7 @@ export const StatsTab: React.FC<StatsTabProps> = ({
                 بیشترین فعالیت
               </span>
               <span className="text-xs font-bold text-neutral-900 dark:text-neutral-100">
-                {weekdayStats.peakDay.name} ({formatHMPersian(weekdayStats.peakDay.totalMinutes)})
+                {weekdayStats.peakDay.name} ({formatHMPersian(weekdayStats.peakDay.totalMinutes)} - {formatDecimalHours(weekdayStats.peakDay.totalMinutes)} ساعت)
               </span>
             </div>
           )}

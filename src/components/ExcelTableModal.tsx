@@ -48,6 +48,12 @@ export const ExcelTableModal: React.FC<ExcelTableModalProps> = ({
   const totalOvertime = monthStats.totalOvertime ?? monthStats.totalOvertimeMinutes ?? 0;
   const totalWorkAndLeave = (monthStats.totalWorkMinutes || 0) + (monthStats.L_minutes || 0);
 
+  const handleDownloadXLS = async () => {
+    setIsExporting(true);
+    await ExportService.exportMonthXLS(monthStats, intervals, leaves);
+    setIsExporting(false);
+  };
+
   const handleDownloadCSV = async () => {
     setIsExporting(true);
     await ExportService.exportMonthCSV(monthStats, intervals, leaves);
@@ -75,12 +81,21 @@ export const ExcelTableModal: React.FC<ExcelTableModalProps> = ({
 
           <div className="flex items-center gap-2">
             <button
-              onClick={handleDownloadCSV}
+              onClick={handleDownloadXLS}
               disabled={isExporting}
               className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-semibold text-xs transition-all shadow-xs disabled:opacity-50"
+              title="خروجی فایل اکسل با ظاهر و استایل‌های کامل جدول"
             >
               <Download className="w-3.5 h-3.5" />
-              <span>{isExporting ? 'در حال خروجی...' : 'دانلود فایل اکسل (CSV)'}</span>
+              <span>{isExporting ? 'در حال خروجی...' : 'دانلود اکسل (استایل‌دار)'}</span>
+            </button>
+            <button
+              onClick={handleDownloadCSV}
+              disabled={isExporting}
+              className="hidden sm:flex items-center gap-1 px-2.5 py-2 rounded-xl bg-neutral-100 dark:bg-neutral-800 hover:bg-neutral-200 dark:hover:bg-neutral-700 active:scale-95 text-neutral-700 dark:text-neutral-200 font-semibold text-xs transition-all border border-neutral-200 dark:border-neutral-700 disabled:opacity-50"
+              title="دانلود فایل سبک متنی CSV"
+            >
+              <span>CSV</span>
             </button>
             <button
               onClick={onClose}
@@ -262,16 +277,23 @@ export const ExcelTableModal: React.FC<ExcelTableModalProps> = ({
           </span>
           <div className="flex items-center gap-2">
             <button
-              onClick={handleDownloadCSV}
+              onClick={handleDownloadXLS}
               disabled={isExporting}
-              className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-semibold text-xs transition-all shadow-xs disabled:opacity-50"
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-semibold text-xs transition-all shadow-xs disabled:opacity-50"
             >
               <Download className="w-3.5 h-3.5" />
-              <span>دانلود اکسل (CSV)</span>
+              <span>دانلود اکسل (استایل‌دار)</span>
+            </button>
+            <button
+              onClick={handleDownloadCSV}
+              disabled={isExporting}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-neutral-100 dark:bg-neutral-800 hover:bg-neutral-200 dark:hover:bg-neutral-700 active:scale-95 text-neutral-800 dark:text-neutral-200 font-semibold text-xs transition-all border border-neutral-300 dark:border-neutral-700 disabled:opacity-50"
+            >
+              <span>دانلود CSV</span>
             </button>
             <button
               onClick={onClose}
-              className="px-4 py-2 rounded-xl bg-neutral-200 dark:bg-neutral-700 hover:bg-neutral-300 dark:hover:bg-neutral-600 text-neutral-800 dark:text-neutral-200 font-semibold text-xs transition-all"
+              className="px-3.5 py-2 rounded-xl bg-neutral-200 dark:bg-neutral-700 hover:bg-neutral-300 dark:hover:bg-neutral-600 text-neutral-800 dark:text-neutral-200 font-semibold text-xs transition-all"
             >
               بستن
             </button>

@@ -390,9 +390,9 @@ export function calculateMonthStats(params: {
   }
 
   // Monthly totals
-  const D_minutes = workDaysCount * dailyQuotaMinutes;
-  const elapsedQuotaMinutes = elapsedWorkDaysCount * dailyQuotaMinutes;
-  const remainingMinutes = Math.max(0, D_minutes - P_minutes - L_minutes);
+  const D_minutes = Math.round(workDaysCount * dailyQuotaMinutes);
+  const elapsedQuotaMinutes = Math.round(elapsedWorkDaysCount * dailyQuotaMinutes);
+  const remainingMinutes = Math.max(0, Math.round(D_minutes - P_minutes - L_minutes));
 
   // Second pass: Calculate day-by-day chronological accumulated overtime
   // Rule:
