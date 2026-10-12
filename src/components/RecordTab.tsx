@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { LeaveRecord, MonthCalculationResult, UserSettings, WorkInterval } from '../types';
 import {
+  calculateDayShiftEvaluation,
   calculateIntervalMinutes,
   validateInterval
 } from '../utils/calculator';
@@ -167,6 +168,42 @@ export const RecordTab: React.FC<RecordTabProps> = ({
   const dayCalculations = monthStats.dailyBreakdown[selectedDate];
   const isWorkDay = dayCalculations ? dayCalculations.isWorkDay : true;
 
+  const standardEntryM = timeStringToMinutes(settings.standardEntryTime || '07:15');
+  const standardExitM = timeStringToMinutes(settings.standardExitTime || '15:30');
+
+  // Live shift evaluation for selected date (07:15 entry delay, 15:30 departure overtime)
+  const dayShiftEval = useMemo(() => {
+    return calculateDayShiftEvaluation({
+      dateStr: selectedDate,
+      dayIntervals,
+      dayLeaves,
+      isWorkDay,
+      standardEntryMinutes: standardEntryM,
+      standardExitMinutes: standardExitM,
+      currentTimeMinutes: nowMinutes,
+      isToday
+    });
+  }, [selectedDate, dayIntervals, dayLeaves, isWorkDay, standardEntryM, standardExitM, nowMinutes, isToday]);
+
+  const delayThisDay = dayShiftEval.delayMinutes;
+  const overtimeThisDay = dayShiftEval.overtimeMinutes;
+
+  // Cumulative metrics up to the selected date
+  const delayUpToThisDay = dayCalculations
+    ? dayCalculations.cumulativeDelayMinutes
+    : delayThisDay;
+  const grossOvertimeUpToThisDay = dayCalculations
+    ? dayCalculations.cumulativeOvertimeMinutes
+    : overtimeThisDay;
+  const netOvertimeUpToThisDay = Math.max(0, grossOvertimeUpToThisDay - delayUpToThisDay);
+
+  const formatHMPersian = (totalMinutes: number) => {
+    const rounded = Math.round(totalMinutes || 0);
+    const h = Math.floor(rounded / 60);
+    const m = Math.abs(rounded % 60);
+    return `${toPersianDigits(h)}:${toPersianDigits(String(m).padStart(2, '0'))}`;
+  };
+
   // Remaining to daily quota (rounded to integer minutes to avoid floating-point seconds):
   const targetDailyQuota = isWorkDay ? dailyQuotaMinutes : 0;
   const remainingTodayMinutes = Math.max(
@@ -175,10 +212,7 @@ export const RecordTab: React.FC<RecordTabProps> = ({
   );
 
   // Overtime today calculation (live and accurate for selected date, integer minutes)
-  const overtimeTodayMinutes = Math.max(
-    0,
-    Math.round(!isWorkDay ? totalDayWorkMinutes : totalDayWorkMinutes - targetDailyQuota)
-  );
+  const overtimeTodayMinutes = overtimeThisDay;
 
   // Entry reminder banner check
   const reminderMinutes = settings.entryReminderTime
@@ -422,63 +456,196 @@ export const RecordTab: React.FC<RecordTabProps> = ({
         </div>
       )}
 
-      {/* Summary Cards: 3 cards grid (بدون ساعت خروج تقریبی) */}
-      <div className="grid grid-cols-3 gap-2">
-        {/* Card 1: Work done so far */}
-        <div className="p-3 rounded-2xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 shadow-xs relative overflow-hidden">
-          <div className="flex items-center justify-between mb-1">
-            <span className="text-[11px] font-semibold text-neutral-500 dark:text-neutral-400 truncate">
-              کارکرد امروز
-            </span>
-            <Clock className="w-3.5 h-3.5 text-neutral-400 shrink-0" />
-          </div>
-          <div className="font-mono font-bold text-base sm:text-lg text-neutral-950 dark:text-neutral-50 tabular-nums">
-            {toPersianDigits(Math.floor(totalDayWorkMinutes / 60))}:
-            {toPersianDigits(String(Math.floor(totalDayWorkMinutes % 60)).padStart(2, '0'))}
-          </div>
-          {openInterval && isToday ? (
-            <div className="text-[9px] text-neutral-600 dark:text-neutral-300 font-medium mt-1 flex items-center gap-1 truncate">
-              <span className="w-1.5 h-1.5 rounded-full bg-neutral-900 dark:bg-white animate-pulse shrink-0" />
-              در حال ثبت...
+      {/* Summary Cards: آمار شیفت روز و مقادیر تجمیعی ماه */}
+      <div className="space-y-2">
+        {/* Row 1: اطلاعات این روز */}
+        <div className="grid grid-cols-3 gap-2">
+          {/* Card 1: کارکرد این روز */}
+          <div className="p-3 rounded-2xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 shadow-xs relative overflow-hidden">
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-[11px] font-semibold text-neutral-500 dark:text-neutral-400 truncate">
+                {isToday ? 'کارکرد امروز' : 'کارکرد این روز'}
+              </span>
+              <Clock className="w-3.5 h-3.5 text-neutral-400 shrink-0" />
             </div>
-          ) : (
+            <div className="font-mono font-bold text-base sm:text-lg text-neutral-950 dark:text-neutral-50 tabular-nums">
+              {formatHMPersian(totalDayWorkMinutes)}
+            </div>
+            {openInterval && isToday ? (
+              <div className="text-[9px] text-neutral-600 dark:text-neutral-300 font-medium mt-1 flex items-center gap-1 truncate">
+                <span className="w-1.5 h-1.5 rounded-full bg-neutral-900 dark:bg-white animate-pulse shrink-0" />
+                در حال ثبت...
+              </div>
+            ) : (
+              <div className="text-[9px] text-neutral-400 mt-1 truncate">
+                مجموع بازه‌ها
+              </div>
+            )}
+          </div>
+
+          {/* Card 2: مقدار تاخیر اون روز */}
+          <div
+            className={`p-3 rounded-2xl border shadow-xs transition-all ${
+              delayThisDay > 0
+                ? 'bg-amber-50/70 dark:bg-amber-950/20 border-amber-200 dark:border-amber-900/40'
+                : 'bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800'
+            }`}
+          >
+            <div className="flex items-center justify-between mb-1">
+              <span
+                className={`text-[11px] font-semibold truncate ${
+                  delayThisDay > 0
+                    ? 'text-amber-700 dark:text-amber-400'
+                    : 'text-neutral-500 dark:text-neutral-400'
+                }`}
+              >
+                {isToday ? 'مقدار تاخیر امروز' : 'مقدار تاخیر این روز'}
+              </span>
+              <AlertCircle
+                className={`w-3.5 h-3.5 shrink-0 ${
+                  delayThisDay > 0
+                    ? 'text-amber-600 dark:text-amber-400'
+                    : 'text-neutral-400'
+                }`}
+              />
+            </div>
+            <div
+              className={`font-mono font-bold text-base sm:text-lg tabular-nums ${
+                delayThisDay > 0
+                  ? 'text-amber-700 dark:text-amber-300'
+                  : 'text-neutral-950 dark:text-neutral-50'
+              }`}
+            >
+              {formatHMPersian(delayThisDay)}
+            </div>
             <div className="text-[9px] text-neutral-400 mt-1 truncate">
-              مجموع بازه‌ها
+              {delayThisDay > 0
+                ? `ورود بعد از ${toPersianDigits(settings.standardEntryTime || '07:15')}`
+                : 'به‌موقع (ساعت ۰۷:۱۵)'}
             </div>
-          )}
+          </div>
+
+          {/* Card 3: اضافه کار اون روز */}
+          <div
+            className={`p-3 rounded-2xl border shadow-xs transition-all ${
+              overtimeThisDay > 0
+                ? 'bg-emerald-50/70 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-900/40'
+                : 'bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800'
+            }`}
+          >
+            <div className="flex items-center justify-between mb-1">
+              <span
+                className={`text-[11px] font-semibold truncate ${
+                  overtimeThisDay > 0
+                    ? 'text-emerald-700 dark:text-emerald-400'
+                    : 'text-neutral-500 dark:text-neutral-400'
+                }`}
+              >
+                {isToday ? 'اضافه‌کار امروز' : 'اضافه‌کار این روز'}
+              </span>
+              <Plus
+                className={`w-3.5 h-3.5 shrink-0 ${
+                  overtimeThisDay > 0
+                    ? 'text-emerald-600 dark:text-emerald-400'
+                    : 'text-neutral-400'
+                }`}
+              />
+            </div>
+            <div
+              className={`font-mono font-bold text-base sm:text-lg tabular-nums ${
+                overtimeThisDay > 0
+                  ? 'text-emerald-700 dark:text-emerald-300'
+                  : 'text-neutral-950 dark:text-neutral-50'
+              }`}
+            >
+              {formatHMPersian(overtimeThisDay)}
+            </div>
+            <div className="text-[9px] text-neutral-400 mt-1 truncate">
+              {!isWorkDay
+                ? 'کار در تعطیلات'
+                : `خروج بعد از ${toPersianDigits(settings.standardExitTime || '15:30')}`}
+            </div>
+          </div>
         </div>
 
-        {/* Card 2: Remaining to Daily Quota */}
-        <div className="p-3 rounded-2xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 shadow-xs">
-          <div className="flex items-center justify-between mb-1">
-            <span className="text-[11px] font-semibold text-neutral-500 dark:text-neutral-400 truncate">
-              مانده تا موظفی
-            </span>
-            <Hourglass className="w-3.5 h-3.5 text-neutral-400 shrink-0" />
+        {/* Row 2: آمار تجمیعی ماه تا این روز */}
+        <div className="grid grid-cols-3 gap-2">
+          {/* Card 4: مقدار تاخیر تا امروز */}
+          <div className="p-3 rounded-2xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 shadow-xs">
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-[11px] font-semibold text-neutral-500 dark:text-neutral-400 truncate">
+                {isToday ? 'مقدار تاخیر تا امروز' : 'مقدار تاخیر تا این روز'}
+              </span>
+              <Hourglass className="w-3.5 h-3.5 text-neutral-400 shrink-0" />
+            </div>
+            <div className="font-mono font-bold text-base sm:text-lg text-amber-700 dark:text-amber-400 tabular-nums">
+              {formatHMPersian(delayUpToThisDay)}
+            </div>
+            <div className="text-[9px] text-neutral-400 mt-1 truncate">
+              مجموع کسر کار ماه
+            </div>
           </div>
-          <div className="font-mono font-bold text-base sm:text-lg text-neutral-950 dark:text-neutral-50 tabular-nums">
-            {toPersianDigits(Math.floor(remainingTodayMinutes / 60))}:
-            {toPersianDigits(String(Math.floor(remainingTodayMinutes % 60)).padStart(2, '0'))}
-          </div>
-          <div className="text-[9px] text-neutral-400 mt-1 truncate">
-            {remainingTodayMinutes === 0 ? 'تکمیل شده' : `موظفی: ${toPersianDigits(settings.dailyQuotaHours)}:${toPersianDigits(String(settings.dailyQuotaMinutes).padStart(2, '0'))}`}
-          </div>
-        </div>
 
-        {/* Card 3: Overtime Today */}
-        <div className="p-3 rounded-2xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 shadow-xs">
-          <div className="flex items-center justify-between mb-1">
-            <span className="text-[11px] font-semibold text-neutral-500 dark:text-neutral-400 truncate">
-              اضافه‌کار امروز
-            </span>
-            <Plus className="w-3.5 h-3.5 text-neutral-400 shrink-0" />
+          {/* Card 5: مجموع اضافه کار تا اون روز */}
+          <div className="p-3 rounded-2xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 shadow-xs">
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-[11px] font-semibold text-neutral-500 dark:text-neutral-400 truncate">
+                {isToday ? 'مجموع اضافه‌کار تا امروز' : 'مجموع اضافه‌کار تا این روز'}
+              </span>
+              <Layers className="w-3.5 h-3.5 text-neutral-400 shrink-0" />
+            </div>
+            <div className="font-mono font-bold text-base sm:text-lg text-emerald-700 dark:text-emerald-400 tabular-nums">
+              {formatHMPersian(grossOvertimeUpToThisDay)}
+            </div>
+            <div className="text-[9px] text-neutral-400 mt-1 truncate">
+              مجموع ناخالص ماه
+            </div>
           </div>
-          <div className="font-mono font-bold text-base sm:text-lg text-neutral-950 dark:text-neutral-50 tabular-nums">
-            {toPersianDigits(Math.floor(overtimeTodayMinutes / 60))}:
-            {toPersianDigits(String(Math.floor(overtimeTodayMinutes % 60)).padStart(2, '0'))}
-          </div>
-          <div className="text-[9px] text-neutral-400 mt-1 truncate">
-            {!isWorkDay ? 'کار روز تعطیل' : 'مازاد موظفی'}
+
+          {/* Card 6: اضافه کار خالص (پس از کسر تاخیرها) */}
+          <div
+            className={`p-3 rounded-2xl border shadow-xs ${
+              netOvertimeUpToThisDay > 0
+                ? 'bg-neutral-900 text-white dark:bg-white dark:text-neutral-950 border-neutral-900 dark:border-white'
+                : 'bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800'
+            }`}
+          >
+            <div className="flex items-center justify-between mb-1">
+              <span
+                className={`text-[11px] font-semibold truncate ${
+                  netOvertimeUpToThisDay > 0
+                    ? 'text-neutral-200 dark:text-neutral-700'
+                    : 'text-neutral-500 dark:text-neutral-400'
+                }`}
+              >
+                اضافه‌کار خالص
+              </span>
+              <CheckCircle2
+                className={`w-3.5 h-3.5 shrink-0 ${
+                  netOvertimeUpToThisDay > 0
+                    ? 'text-emerald-400 dark:text-emerald-600'
+                    : 'text-neutral-400'
+                }`}
+              />
+            </div>
+            <div
+              className={`font-mono font-bold text-base sm:text-lg tabular-nums ${
+                netOvertimeUpToThisDay > 0
+                  ? 'text-white dark:text-neutral-950'
+                  : 'text-neutral-950 dark:text-neutral-50'
+              }`}
+            >
+              {formatHMPersian(netOvertimeUpToThisDay)}
+            </div>
+            <div
+              className={`text-[9px] mt-1 truncate ${
+                netOvertimeUpToThisDay > 0
+                  ? 'text-neutral-300 dark:text-neutral-600'
+                  : 'text-neutral-400'
+              }`}
+            >
+              اضافه‌کار منهای کسر کار
+            </div>
           </div>
         </div>
       </div>

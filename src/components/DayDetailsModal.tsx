@@ -62,23 +62,42 @@ export const DayDetailsModal: React.FC<DayDetailsModalProps> = ({
         </div>
 
         {/* Metric Summary */}
-        <div className="grid grid-cols-3 gap-2 py-2">
-          <div className="p-2.5 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-800/50 text-center">
+        <div className="grid grid-cols-3 gap-1.5 py-2">
+          <div className="p-2 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-800/50 text-center">
             <span className="text-[10px] text-neutral-500 block mb-0.5">کارکرد</span>
-            <span className="font-bold text-xs text-neutral-900 dark:text-neutral-100">
+            <span className="font-bold text-xs text-neutral-900 dark:text-neutral-100 font-mono">
               {formatMinutesToPersianHM(dayResult.workMinutes)}
             </span>
           </div>
-          <div className="p-2.5 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-800/50 text-center">
-            <span className="text-[10px] text-neutral-500 block mb-0.5">مرخصی</span>
-            <span className="font-bold text-xs text-neutral-900 dark:text-neutral-100">
-              {formatMinutesToPersianHM(dayResult.leaveMinutes)}
+          <div className="p-2 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-800/50 text-center">
+            <span className="text-[10px] text-amber-600 dark:text-amber-400 block mb-0.5 font-medium">مقدار تاخیر این روز</span>
+            <span className="font-bold text-xs text-amber-700 dark:text-amber-300 font-mono">
+              {formatMinutesToPersianHM(dayResult.delayMinutes)}
             </span>
           </div>
-          <div className="p-2.5 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-800/50 text-center">
-            <span className="text-[10px] text-neutral-500 block mb-0.5">اضافه‌کار</span>
-            <span className="font-bold text-xs text-neutral-900 dark:text-neutral-100">
+          <div className="p-2 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-800/50 text-center">
+            <span className="text-[10px] text-emerald-600 dark:text-emerald-400 block mb-0.5 font-medium">اضافه‌کار این روز</span>
+            <span className="font-bold text-xs text-emerald-700 dark:text-emerald-300 font-mono">
               {formatMinutesToPersianHM(dayResult.overtimeMinutes)}
+            </span>
+          </div>
+
+          <div className="p-2 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-800/50 text-center">
+            <span className="text-[10px] text-neutral-500 block mb-0.5">مقدار تاخیر تا این روز</span>
+            <span className="font-bold text-xs text-neutral-900 dark:text-neutral-100 font-mono">
+              {formatMinutesToPersianHM(dayResult.cumulativeDelayMinutes)}
+            </span>
+          </div>
+          <div className="p-2 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-800/50 text-center">
+            <span className="text-[10px] text-neutral-500 block mb-0.5">مجموع اضافه‌کار تا این روز</span>
+            <span className="font-bold text-xs text-neutral-900 dark:text-neutral-100 font-mono">
+              {formatMinutesToPersianHM(dayResult.cumulativeOvertimeMinutes)}
+            </span>
+          </div>
+          <div className="p-2 rounded-xl border border-emerald-300 dark:border-emerald-800 bg-emerald-50/70 dark:bg-emerald-950/30 text-center">
+            <span className="text-[10px] text-emerald-700 dark:text-emerald-400 block mb-0.5 font-semibold">اضافه‌کار خالص</span>
+            <span className="font-bold text-xs text-emerald-700 dark:text-emerald-300 font-mono">
+              {formatMinutesToPersianHM(dayResult.netOvertimeMinutes)}
             </span>
           </div>
         </div>

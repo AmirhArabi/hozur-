@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import {
+  AlertCircle,
   BarChart3,
   Calendar as CalendarIcon,
   CheckCircle2,
@@ -37,6 +38,7 @@ import {
 import { DayDetailsModal } from './DayDetailsModal';
 import { ExcelTableModal } from './ExcelTableModal';
 import { PdfReportModal } from './PdfReportModal';
+import { WorkDistributionPieChart } from './WorkDistributionPieChart';
 import { ExportService } from '../services/export';
 
 interface StatsTabProps {
@@ -209,6 +211,20 @@ export const StatsTab: React.FC<StatsTabProps> = ({
   const quotaProgressPct = Math.min(100, Number(rawProgress.toFixed(1)));
   const quotaProgressFormatted = toPersianDigits(quotaProgressPct % 1 === 0 ? quotaProgressPct.toFixed(0) : quotaProgressPct.toFixed(1));
 
+  // Shift Evaluation metrics (07:15 arrival delay & 15:30 departure overtime offset model)
+  const todayDayResult = isCurrentMonth ? monthStats?.dailyBreakdown?.[todayStr] : null;
+  const delayToday = todayDayResult?.delayMinutes ?? 0;
+  const overtimeToday = todayDayResult?.overtimeMinutes ?? 0;
+  const delayUpToToday = isCurrentMonth
+    ? (monthStats?.elapsedDelayMinutes ?? 0)
+    : (monthStats?.totalDelayMinutes ?? 0);
+  const overtimeUpToToday = isCurrentMonth
+    ? (monthStats?.elapsedGrossOvertimeMinutes ?? 0)
+    : (monthStats?.grossOvertimeMinutes ?? 0);
+  const netOvertimeUpToToday = isCurrentMonth
+    ? (monthStats?.elapsedNetOvertimeMinutes ?? 0)
+    : (monthStats?.netOvertimeMinutes ?? 0);
+
   return (
     <div className="space-y-4 pb-20 pt-2 animate-in fade-in duration-200">
       {/* Month Navigator Header */}
@@ -302,16 +318,16 @@ export const StatsTab: React.FC<StatsTabProps> = ({
           <div className="p-3.5 rounded-2xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 shadow-xs">
             <div className="flex items-center justify-between mb-1.5">
               <span className="text-xs font-semibold text-neutral-500 dark:text-neutral-400">
-                ساعات اضافه کار
+                ساعات اضافه کار (خالص)
               </span>
-              <PlusCircle className="w-4 h-4 text-neutral-400" />
+              <PlusCircle className="w-4 h-4 text-emerald-500" />
             </div>
-            <div className="font-mono font-bold text-2xl text-neutral-950 dark:text-neutral-50 tabular-nums">
-              {formatHMPersian(calculatedTotalOvertime)}
+            <div className="font-mono font-bold text-2xl text-emerald-700 dark:text-emerald-400 tabular-nums">
+              {formatHMPersian(monthStats.netOvertimeMinutes ?? calculatedTotalOvertime)}
             </div>
-            <div className="text-[10px] text-neutral-400 mt-1">
-              عادی: {formatHMPersian(calculatedNormalOvertime)} | تعطیل:{' '}
-              {formatHMPersian(calculatedHolidayOvertime)} ({formatDecimalHours(calculatedTotalOvertime)} ساعت)
+            <div className="text-[10px] text-neutral-400 mt-1 truncate">
+              ناخالص: {formatHMPersian(monthStats.grossOvertimeMinutes ?? calculatedTotalOvertime)} | کسر تاخیر:{' '}
+              {formatHMPersian(monthStats.totalDelayMinutes ?? 0)}
             </div>
           </div>
 
@@ -382,8 +398,144 @@ export const StatsTab: React.FC<StatsTabProps> = ({
           </div>
         </div>
 
+        {/* --- CARDS: مدل شیفت ورود ۰۷:۱۵ و خروج ۱۵:۳۰ با تهاتر تاخیر و اضافه‌کار --- */}
+        <div className="p-4 rounded-3xl bg-neutral-50 dark:bg-neutral-900/60 border border-neutral-200 dark:border-neutral-800 space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="p-1.5 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400">
+                <Clock className="w-4 h-4" />
+              </div>
+              <div>
+                <span className="text-xs font-bold text-neutral-900 dark:text-neutral-100 block">
+                  رهگیری تاخیر و اضافه‌کار شیفت (ورود ۰۷:۱۵ | خروج ۱۵:۳۰)
+                </span>
+                <span className="text-[10px] text-neutral-400">
+                  کسر تاخیر از اضافه‌کار: مانده برابر با اضافه‌کار خالص است
+                </span>
+              </div>
+            </div>
+            {isCurrentMonth && (
+              <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300">
+                ماه جاری
+              </span>
+            )}
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+            {/* Card 1: مقدار تاخیر اون روز / امروز */}
+            <div className="p-3 rounded-2xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 shadow-2xs">
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-[11px] font-semibold text-amber-700 dark:text-amber-400 truncate">
+                  {isCurrentMonth ? 'مقدار تاخیر امروز' : 'تاخیر آخرین روز'}
+                </span>
+                <AlertCircle className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+              </div>
+              <div className="font-mono font-bold text-lg text-amber-800 dark:text-amber-300 tabular-nums">
+                {formatHMPersian(delayToday)}
+              </div>
+              <div className="text-[10px] text-neutral-400 mt-1 truncate">
+                {delayToday > 0 ? `ورود بعد از ${toPersianDigits('07:15')} (${formatDecimalHours(delayToday)} ساعت)` : 'به‌موقع (ساعت ۰۷:۱۵)'}
+              </div>
+            </div>
+
+            {/* Card 2: مقدار تاخیر تا امروز */}
+            <div className="p-3 rounded-2xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 shadow-2xs">
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-[11px] font-semibold text-amber-700 dark:text-amber-400 truncate">
+                  {isCurrentMonth ? 'مقدار تاخیر تا امروز' : 'مجموع تاخیر ماه'}
+                </span>
+                <Hourglass className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+              </div>
+              <div className="font-mono font-bold text-lg text-amber-800 dark:text-amber-300 tabular-nums">
+                {formatHMPersian(delayUpToToday)}
+              </div>
+              <div className="text-[10px] text-neutral-400 mt-1 truncate">
+                مجموع کسر کار ماه ({formatDecimalHours(delayUpToToday)} ساعت)
+              </div>
+            </div>
+
+            {/* Card 3: اضافه کار اون روز / امروز */}
+            <div className="p-3 rounded-2xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 shadow-2xs">
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-[11px] font-semibold text-emerald-700 dark:text-emerald-400 truncate">
+                  {isCurrentMonth ? 'اضافه‌کار امروز' : 'اضافه‌کار آخرین روز'}
+                </span>
+                <PlusCircle className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+              </div>
+              <div className="font-mono font-bold text-lg text-emerald-800 dark:text-emerald-300 tabular-nums">
+                {formatHMPersian(overtimeToday)}
+              </div>
+              <div className="text-[10px] text-neutral-400 mt-1 truncate">
+                {overtimeToday > 0 ? `خروج بعد از ${toPersianDigits('15:30')} (${formatDecimalHours(overtimeToday)} ساعت)` : 'بدون اضافه‌کار'}
+              </div>
+            </div>
+
+            {/* Card 4: مجموع اضافه کار تا اون روز / تا امروز */}
+            <div className="p-3 rounded-2xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 shadow-2xs">
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-[11px] font-semibold text-emerald-700 dark:text-emerald-400 truncate">
+                  {isCurrentMonth ? 'مجموع اضافه‌کار تا امروز' : 'مجموع اضافه‌کار ناخالص'}
+                </span>
+                <Layers className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+              </div>
+              <div className="font-mono font-bold text-lg text-emerald-800 dark:text-emerald-300 tabular-nums">
+                {formatHMPersian(overtimeUpToToday)}
+              </div>
+              <div className="text-[10px] text-neutral-400 mt-1 truncate">
+                مجموع ناخالص ({formatDecimalHours(overtimeUpToToday)} ساعت)
+              </div>
+            </div>
+          </div>
+
+          {/* Banner: اضافه کار خالص (نتیجه تهاتر) */}
+          <div className="p-3 rounded-2xl bg-neutral-900 text-white dark:bg-white dark:text-neutral-950 flex items-center justify-between gap-3 shadow-xs">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="p-1.5 rounded-xl bg-emerald-500/20 text-emerald-400 dark:bg-emerald-500/20 dark:text-emerald-600 shrink-0">
+                <CheckCircle2 className="w-4 h-4" />
+              </div>
+              <div className="min-w-0">
+                <div className="text-xs font-bold truncate">
+                  {isCurrentMonth ? 'اضافه‌کار خالص تا امروز' : 'اضافه‌کار خالص کل ماه'} (پس از کسر تاخیرها)
+                </div>
+                <div className="text-[10px] text-neutral-300 dark:text-neutral-600 truncate">
+                  مجموع اضافه‌کار ({formatHMPersian(overtimeUpToToday)}) − مجموع تاخیر ({formatHMPersian(delayUpToToday)}) = باقی‌مانده اضافه‌کار
+                </div>
+              </div>
+            </div>
+            <div className="font-mono font-bold text-lg text-emerald-400 dark:text-emerald-600 tabular-nums shrink-0">
+              {formatHMPersian(netOvertimeUpToToday)}
+            </div>
+          </div>
+        </div>
+
         {/* Secondary Informative Cards */}
-        <div className="grid grid-cols-2 gap-2.5">
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+          {/* Card: مجموع تاخیر و کسر کار */}
+          <div className="p-3 rounded-2xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 shadow-xs">
+            <span className="text-[11px] font-semibold text-amber-600 dark:text-amber-400 block mb-1">
+              مجموع تاخیر و کسر کار
+            </span>
+            <div className="font-mono font-bold text-lg text-amber-700 dark:text-amber-300 tabular-nums">
+              {formatHMPersian(monthStats.totalDelayMinutes ?? 0)}
+            </div>
+            <div className="text-[10px] text-neutral-400 truncate">
+              تا امروز: {formatHMPersian(monthStats.elapsedDelayMinutes ?? 0)} ({formatDecimalHours(monthStats.totalDelayMinutes ?? 0)} ساعت)
+            </div>
+          </div>
+
+          {/* Card: مجموع اضافه‌کار ناخالص */}
+          <div className="p-3 rounded-2xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 shadow-xs">
+            <span className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 block mb-1">
+              اضافه‌کار ناخالص ماه
+            </span>
+            <div className="font-mono font-bold text-lg text-emerald-700 dark:text-emerald-300 tabular-nums">
+              {formatHMPersian(monthStats.grossOvertimeMinutes ?? 0)}
+            </div>
+            <div className="text-[10px] text-neutral-400 truncate">
+              قبل از کسر تاخیر ({formatDecimalHours(monthStats.grossOvertimeMinutes ?? 0)} ساعت)
+            </div>
+          </div>
+
           {/* Card: ساعات مرخصی */}
           <div className="p-3 rounded-2xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 shadow-xs">
             <span className="text-[11px] font-semibold text-neutral-500 block mb-1">
@@ -392,7 +544,7 @@ export const StatsTab: React.FC<StatsTabProps> = ({
             <div className="font-mono font-bold text-lg text-neutral-900 dark:text-neutral-100 tabular-nums">
               {formatHMPersian(monthStats.L_minutes)}
             </div>
-            <div className="text-[10px] text-neutral-400">
+            <div className="text-[10px] text-neutral-400 truncate">
               استحقاقی / ساعتی ({formatDecimalHours(monthStats.L_minutes)} ساعت)
             </div>
           </div>
@@ -405,7 +557,7 @@ export const StatsTab: React.FC<StatsTabProps> = ({
             <div className="font-bold text-lg text-neutral-900 dark:text-neutral-100">
               {toPersianDigits(monthStats.daysWithLeaveCount)} روز
             </div>
-            <div className="text-[10px] text-neutral-400">
+            <div className="text-[10px] text-neutral-400 truncate">
               ثبت‌شده در این ماه
             </div>
           </div>
@@ -418,7 +570,7 @@ export const StatsTab: React.FC<StatsTabProps> = ({
             <div className="font-bold text-lg text-neutral-900 dark:text-neutral-100">
               {toPersianDigits(monthStats.daysWithWorkCount)} روز
             </div>
-            <div className="text-[10px] text-neutral-400">
+            <div className="text-[10px] text-neutral-400 truncate">
               از {toPersianDigits(daysInMonth)} روز کل ماه
             </div>
           </div>
@@ -437,6 +589,12 @@ export const StatsTab: React.FC<StatsTabProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Work Distribution Pie Chart (نمودار دایره‌ای توزیع کارکرد، مرخصی و اضافه‌کار) */}
+      <WorkDistributionPieChart
+        monthStats={monthStats}
+        calculatedTotalOvertime={calculatedTotalOvertime}
+      />
 
       {/* Weekly Work Hours Bar Chart (نمودار میله‌ای مجموع ساعات کاری در روزهای هفته) */}
       <div className="bg-white dark:bg-neutral-900 rounded-3xl border border-neutral-200 dark:border-neutral-800 p-4 sm:p-5 shadow-xs space-y-3.5">

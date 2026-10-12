@@ -130,15 +130,15 @@ export const ExcelTableModal: React.FC<ExcelTableModalProps> = ({
             </span>
           </div>
           <div className="bg-white dark:bg-neutral-900 p-2.5 rounded-xl border border-neutral-200 dark:border-neutral-800">
-            <span className="text-[10px] text-neutral-500 block">ساعات اضافه کار</span>
-            <span className="font-bold text-sm font-mono text-neutral-950 dark:text-neutral-50">
-              {formatMinutesToPersianHM(totalOvertime)}
+            <span className="text-[10px] text-amber-600 dark:text-amber-400 block font-semibold">مجموع تاخیر ماه</span>
+            <span className="font-bold text-sm font-mono text-amber-700 dark:text-amber-300">
+              {formatMinutesToPersianHM(monthStats.totalDelayMinutes ?? 0)}
             </span>
           </div>
           <div className="bg-white dark:bg-neutral-900 p-2.5 rounded-xl border border-neutral-200 dark:border-neutral-800">
-            <span className="text-[10px] text-neutral-500 block">کارکرد تا امروز (کاری + مرخصی)</span>
-            <span className="font-bold text-sm font-mono text-neutral-950 dark:text-neutral-50">
-              {formatMinutesToPersianHM(totalWorkAndLeave)}
+            <span className="text-[10px] text-emerald-600 dark:text-emerald-400 block font-semibold">اضافه‌کار خالص (پس از کسر تاخیر)</span>
+            <span className="font-bold text-sm font-mono text-emerald-700 dark:text-emerald-300">
+              {formatMinutesToPersianHM(monthStats.netOvertimeMinutes ?? totalOvertime)}
             </span>
           </div>
         </div>
@@ -156,7 +156,8 @@ export const ExcelTableModal: React.FC<ExcelTableModalProps> = ({
                   <th className="py-2.5 px-3 min-w-[140px]">بازه‌های کاری</th>
                   <th className="py-2.5 px-3 min-w-[110px]">مرخصی</th>
                   <th className="py-2.5 px-3 min-w-[80px] text-center font-mono">ساعت کارکرد</th>
-                  <th className="py-2.5 px-3 min-w-[80px] text-center font-mono">ساعت اضافه کار</th>
+                  <th className="py-2.5 px-3 min-w-[80px] text-center font-mono">تاخیر ورود</th>
+                  <th className="py-2.5 px-3 min-w-[80px] text-center font-mono">اضافه کار</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-neutral-200 dark:divide-neutral-800">
@@ -168,6 +169,7 @@ export const ExcelTableModal: React.FC<ExcelTableModalProps> = ({
 
                   const isHoliday = day.isOfficialHoliday || day.isWeeklyHoliday;
                   const hasOvertime = day.overtimeMinutes > 0;
+                  const hasDelay = day.delayMinutes > 0;
 
                   return (
                     <tr
@@ -204,7 +206,7 @@ export const ExcelTableModal: React.FC<ExcelTableModalProps> = ({
                             تعطیل هفتگی
                           </span>
                         ) : (
-                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-neutral-100 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300">
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-neutral-100 text-neutral-700 dark:bg-neutral-800 dark:text-neutral-300">
                             روز کاری عادی
                           </span>
                         )}
@@ -248,6 +250,17 @@ export const ExcelTableModal: React.FC<ExcelTableModalProps> = ({
                         {day.workMinutes > 0 ? formatMinutesToPersianHM(day.workMinutes) : '-'}
                       </td>
 
+                      {/* تاخیر ورود */}
+                      <td className="py-2 px-3 text-center font-mono font-bold">
+                        {hasDelay ? (
+                          <span className="text-amber-600 dark:text-amber-400">
+                            {formatMinutesToPersianHM(day.delayMinutes)}
+                          </span>
+                        ) : (
+                          <span className="text-neutral-300 dark:text-neutral-600">-</span>
+                        )}
+                      </td>
+
                       {/* ساعت اضافه کار */}
                       <td className="py-2 px-3 text-center font-mono font-bold">
                         {hasOvertime ? (
@@ -270,8 +283,11 @@ export const ExcelTableModal: React.FC<ExcelTableModalProps> = ({
                   <td className="py-2.5 px-3 text-center font-mono text-neutral-950 dark:text-neutral-50 text-sm">
                     {formatMinutesToPersianHM(monthStats.totalWorkMinutes)}
                   </td>
+                  <td className="py-2.5 px-3 text-center font-mono text-amber-600 dark:text-amber-400 text-sm">
+                    {formatMinutesToPersianHM(monthStats.totalDelayMinutes ?? 0)}
+                  </td>
                   <td className="py-2.5 px-3 text-center font-mono text-emerald-600 dark:text-emerald-400 text-sm">
-                    {formatMinutesToPersianHM(totalOvertime)}
+                    {formatMinutesToPersianHM(monthStats.netOvertimeMinutes ?? totalOvertime)}
                   </td>
                 </tr>
               </tfoot>

@@ -131,14 +131,195 @@ export const DEFAULT_FIXED_HOLIDAYS: OfficialHoliday[] = [
 
 export const DEFAULT_SETTINGS: UserSettings = {
   dailyQuotaHours: 8,
-  dailyQuotaMinutes: 30, // 8h 30m = 510 minutes
+  dailyQuotaMinutes: 15, // 8h 15m = 495 minutes (07:15 to 15:30)
+  standardEntryTime: '07:15',
+  standardExitTime: '15:30',
   isThursdayHoliday: false, // Friday is always holiday
   departureReminderEnabled: false,
   reminderMinutesBeforeQuota: 0,
   entryReminderEnabled: false,
-  entryReminderTime: '09:00',
+  entryReminderTime: '07:15',
   theme: 'dark'
 };
+
+/**
+ * Calculates day shift evaluation:
+ * - Entry delay after standardEntryTime (default 07:15)
+ * - Early departure deficit before standardExitTime (default 15:30)
+ * - Overtime after standardExitTime (default 15:30) or 100% on holidays
+ */
+export function calculateDayShiftEvaluation(params: {
+  dateStr: string;
+  dayIntervals: WorkInterval[];
+  dayLeaves: LeaveRecord[];
+  isWorkDay: boolean;
+  standardEntryMinutes?: number; // default 435 (07:15)
+  standardExitMinutes?: number;  // default 930 (15:30)
+  currentTimeMinutes?: number;
+  isToday?: boolean;
+}): {
+  dayWorkMinutes: number;
+  delayMinutes: number;
+  entryDelayMinutes: number;
+  earlyDepartureMinutes: number;
+  overtimeMinutes: number;
+} {
+  const {
+    dayIntervals,
+    dayLeaves,
+    isWorkDay,
+    standardEntryMinutes = 7 * 60 + 15, // 435 (07:15)
+    standardExitMinutes = 15 * 60 + 30, // 930 (15:30)
+    currentTimeMinutes,
+    isToday = false
+  } = params;
+
+  // 1. Calculate total work minutes
+  let dayWorkMinutes = 0;
+  for (const inter of dayIntervals) {
+    if (inter.endTime === null) {
+      if (isToday && currentTimeMinutes !== undefined) {
+        dayWorkMinutes += calculateIntervalMinutes(inter.startTime, null, currentTimeMinutes);
+      }
+    } else {
+      dayWorkMinutes += calculateIntervalMinutes(inter.startTime, inter.endTime);
+    }
+  }
+
+  // 2. Holiday evaluation:
+  if (!isWorkDay) {
+    return {
+      dayWorkMinutes,
+      delayMinutes: 0,
+      entryDelayMinutes: 0,
+      earlyDepartureMinutes: 0,
+      overtimeMinutes: dayWorkMinutes
+    };
+  }
+
+  // 3. Normal work day:
+  const hasFullDayLeave = dayLeaves.some((l) => l.type === 'full_day');
+  if (hasFullDayLeave) {
+    return {
+      dayWorkMinutes,
+      delayMinutes: 0,
+      entryDelayMinutes: 0,
+      earlyDepartureMinutes: 0,
+      overtimeMinutes: 0
+    };
+  }
+
+  // Calculate Overtime on work day:
+  // Rule: "هر چقدر از ساعت 3:30 (15:30) دیرتر خارج شوم اضافه کار میخورم بدون توجه به ساعت ورودم"
+  let overtimeMinutes = 0;
+  for (const inter of dayIntervals) {
+    const startM = timeStringToMinutes(inter.startTime);
+    const endM =
+      inter.endTime !== null
+        ? timeStringToMinutes(inter.endTime)
+        : isToday && currentTimeMinutes !== undefined
+        ? currentTimeMinutes
+        : startM;
+
+    if (endM > standardExitMinutes) {
+      const ot = endM - Math.max(startM, standardExitMinutes);
+      overtimeMinutes += Math.max(0, ot);
+    }
+  }
+
+  // Calculate Delay / Deficit on work day:
+  // Rule: "ساعت ورودم به شرکت باید در روزهای غیر تعطیل ساعت 7 و 15 دقیقه باشد. هرمقدار که از این ساعت دیرتر ورود بزنم برایم کسر کار یا تاخیر در نظر گرفته میشه"
+  let entryDelayMinutes = 0;
+  let earlyDepartureMinutes = 0;
+
+  if (dayIntervals.length > 0) {
+    const sorted = [...dayIntervals].sort(
+      (a, b) => timeStringToMinutes(a.startTime) - timeStringToMinutes(b.startTime)
+    );
+    const firstStart = timeStringToMinutes(sorted[0].startTime);
+
+    if (firstStart > standardEntryMinutes) {
+      let rawDelay = firstStart - standardEntryMinutes;
+      // Subtract approved hourly leaves covering morning delay
+      for (const l of dayLeaves) {
+        if (l.type === 'hourly' && l.startTime && l.endTime) {
+          const lStart = timeStringToMinutes(l.startTime);
+          const lEnd = timeStringToMinutes(l.endTime);
+          const overlap = Math.max(
+            0,
+            Math.min(firstStart, lEnd) - Math.max(standardEntryMinutes, lStart)
+          );
+          rawDelay = Math.max(0, rawDelay - overlap);
+        } else if (l.type === 'hourly') {
+          rawDelay = Math.max(0, rawDelay - l.durationMinutes);
+        }
+      }
+      entryDelayMinutes = rawDelay;
+    }
+
+    // Early departure (if closed and not currently working, and workday has passed exit time)
+    const hasOpenInterval = dayIntervals.some((i) => i.endTime === null);
+    const isDayPastExitTime =
+      !isToday ||
+      (currentTimeMinutes !== undefined && currentTimeMinutes >= standardExitMinutes);
+
+    if (!hasOpenInterval && isDayPastExitTime) {
+      const lastEnd = Math.max(
+        ...sorted.map((i) =>
+          i.endTime !== null
+            ? timeStringToMinutes(i.endTime)
+            : isToday && currentTimeMinutes !== undefined
+            ? currentTimeMinutes
+            : standardExitMinutes
+        )
+      );
+
+      if (lastEnd < standardExitMinutes) {
+        let rawEarly = standardExitMinutes - lastEnd;
+        for (const l of dayLeaves) {
+          if (l.type === 'hourly' && l.startTime && l.endTime) {
+            const lStart = timeStringToMinutes(l.startTime);
+            const lEnd = timeStringToMinutes(l.endTime);
+            const overlap = Math.max(
+              0,
+              Math.min(standardExitMinutes, lEnd) - Math.max(lastEnd, lStart)
+            );
+            rawEarly = Math.max(0, rawEarly - overlap);
+          }
+        }
+        earlyDepartureMinutes = rawEarly;
+      }
+    }
+  } else {
+    // No intervals on this workday
+    if (isToday && currentTimeMinutes !== undefined) {
+      if (currentTimeMinutes > standardEntryMinutes) {
+        entryDelayMinutes = currentTimeMinutes - standardEntryMinutes;
+        for (const l of dayLeaves) {
+          if (l.type === 'hourly' && l.startTime && l.endTime) {
+            const lStart = timeStringToMinutes(l.startTime);
+            const lEnd = timeStringToMinutes(l.endTime);
+            const overlap = Math.max(
+              0,
+              Math.min(currentTimeMinutes, lEnd) - Math.max(standardEntryMinutes, lStart)
+            );
+            entryDelayMinutes = Math.max(0, entryDelayMinutes - overlap);
+          }
+        }
+      }
+    }
+  }
+
+  const delayMinutes = entryDelayMinutes + earlyDepartureMinutes;
+
+  return {
+    dayWorkMinutes,
+    delayMinutes,
+    entryDelayMinutes,
+    earlyDepartureMinutes,
+    overtimeMinutes
+  };
+}
 
 /**
  * Calculates duration in minutes for an interval.
@@ -292,6 +473,9 @@ export function calculateMonthStats(params: {
     }
   }
 
+  const standardEntryM = timeStringToMinutes(settings.standardEntryTime || '07:15');
+  const standardExitM = timeStringToMinutes(settings.standardExitTime || '15:30');
+
   // First pass: identify work days, calculate daily work and leave totals
   interface TempDayData {
     date: string;
@@ -300,8 +484,12 @@ export function calculateMonthStats(params: {
     isOfficialHoliday: boolean;
     holidayTitle?: string;
     isWorkDay: boolean;
+    isElapsed: boolean;
     workMinutes: number;
     leaveMinutes: number;
+    delayMinutes: number;
+    entryDelayMinutes: number;
+    overtimeMinutes: number;
   }
 
   const tempDays: TempDayData[] = [];
@@ -313,47 +501,48 @@ export function calculateMonthStats(params: {
     const officialHolidayResult = isDateOfficialHoliday(dateStr, holidays);
     const isWorkDay = !weeklyHoliday && !officialHolidayResult.isHoliday;
 
+    let isElapsed = false;
+    if (!parsedCurrentDate) {
+      isElapsed = true;
+    } else if (
+      year < parsedCurrentDate.year ||
+      (year === parsedCurrentDate.year && month < parsedCurrentDate.month)
+    ) {
+      isElapsed = true;
+    } else if (
+      year === parsedCurrentDate.year &&
+      month === parsedCurrentDate.month &&
+      day <= parsedCurrentDate.day
+    ) {
+      isElapsed = true;
+    } else {
+      isElapsed = false;
+    }
+
     if (isWorkDay) {
       workDaysCount += 1;
-
-      let isElapsed = false;
-      if (!parsedCurrentDate) {
-        isElapsed = true;
-      } else if (
-        year < parsedCurrentDate.year ||
-        (year === parsedCurrentDate.year && month < parsedCurrentDate.month)
-      ) {
-        isElapsed = true;
-      } else if (
-        year === parsedCurrentDate.year &&
-        month === parsedCurrentDate.month &&
-        day <= parsedCurrentDate.day
-      ) {
-        isElapsed = true;
-      } else {
-        isElapsed = false;
-      }
-
       if (isElapsed) {
         elapsedWorkDaysCount += 1;
       }
     }
 
-    // Work minutes on this day
+    // Day intervals & leaves
     const dayIntervals = intervalsByDate.get(dateStr) || [];
-    let dayWorkMinutes = 0;
-    for (const inter of dayIntervals) {
-      if (inter.endTime === null) {
-        if (dateStr === currentDateStr && currentTimeMinutes !== undefined) {
-          dayWorkMinutes += calculateIntervalMinutes(inter.startTime, null, currentTimeMinutes);
-        }
-      } else {
-        dayWorkMinutes += calculateIntervalMinutes(inter.startTime, inter.endTime);
-      }
-    }
+    const dayLeaves = leavesByDate.get(dateStr) || [];
+
+    // Evaluate day shift (07:15 arrival delay, 15:30 departure overtime, holidays)
+    const shiftEval = calculateDayShiftEvaluation({
+      dateStr,
+      dayIntervals,
+      dayLeaves,
+      isWorkDay,
+      standardEntryMinutes: standardEntryM,
+      standardExitMinutes: standardExitM,
+      currentTimeMinutes,
+      isToday: dateStr === currentDateStr
+    });
 
     // Leave minutes on this day
-    const dayLeaves = leavesByDate.get(dateStr) || [];
     let dayLeaveMinutes = 0;
     for (const l of dayLeaves) {
       if (l.type === 'full_day') {
@@ -363,7 +552,7 @@ export function calculateMonthStats(params: {
       }
     }
 
-    if (dayWorkMinutes > 0) {
+    if (shiftEval.dayWorkMinutes > 0) {
       daysWithWorkCount += 1;
     }
     if (dayLeaveMinutes > 0) {
@@ -371,10 +560,10 @@ export function calculateMonthStats(params: {
     }
 
     if (isWorkDay) {
-      P_minutes += dayWorkMinutes;
+      P_minutes += shiftEval.dayWorkMinutes;
       L_minutes += dayLeaveMinutes;
     } else {
-      H_minutes += dayWorkMinutes;
+      H_minutes += shiftEval.dayWorkMinutes;
     }
 
     tempDays.push({
@@ -384,8 +573,12 @@ export function calculateMonthStats(params: {
       isOfficialHoliday: officialHolidayResult.isHoliday,
       holidayTitle: officialHolidayResult.title,
       isWorkDay,
-      workMinutes: dayWorkMinutes,
-      leaveMinutes: dayLeaveMinutes
+      isElapsed,
+      workMinutes: shiftEval.dayWorkMinutes,
+      leaveMinutes: dayLeaveMinutes,
+      delayMinutes: shiftEval.delayMinutes,
+      entryDelayMinutes: shiftEval.entryDelayMinutes,
+      overtimeMinutes: shiftEval.overtimeMinutes
     });
   }
 
@@ -394,30 +587,25 @@ export function calculateMonthStats(params: {
   const elapsedQuotaMinutes = Math.round(elapsedWorkDaysCount * dailyQuotaMinutes);
   const remainingMinutes = Math.max(0, Math.round(D_minutes - P_minutes - L_minutes));
 
-  // Second pass: Calculate day-by-day chronological accumulated overtime
-  // Rule:
-  // - On a holiday, full work of that day is overtime.
-  // - On a normal work day, work exceeding the daily quota is daily overtime.
-  // - Accumulated normal overtime reflects all daily overtimes on work days (or month surplus if higher).
+  // Second pass: Chronological day-by-day accumulation
   const dailyBreakdown: Record<string, DayCalculationResult> = {};
-  let normalOvertimeMinutes = 0;
-  let cumTotalOvertime = 0;
   let cumTotalWork = 0;
+  let cumTotalOvertime = 0;
+  let cumTotalDelay = 0;
+  let elapsedDelayMinutes = 0;
+  let elapsedGrossOvertimeMinutes = 0;
 
   for (const d of tempDays) {
-    let dayOvertime = 0;
     cumTotalWork += d.workMinutes;
+    cumTotalOvertime += d.overtimeMinutes;
+    cumTotalDelay += d.delayMinutes;
 
-    if (!d.isWorkDay) {
-      // Holiday: all work today is overtime
-      dayOvertime = d.workMinutes;
-    } else {
-      // Normal work day: any work exceeding daily quota is daily overtime
-      dayOvertime = Math.max(0, d.workMinutes - dailyQuotaMinutes);
-      normalOvertimeMinutes += dayOvertime;
+    if (d.isElapsed) {
+      elapsedDelayMinutes += d.delayMinutes;
+      elapsedGrossOvertimeMinutes += d.overtimeMinutes;
     }
 
-    cumTotalOvertime += dayOvertime;
+    const netDayOvertime = Math.max(0, cumTotalOvertime - cumTotalDelay);
 
     dailyBreakdown[d.date] = {
       date: d.date,
@@ -428,16 +616,25 @@ export function calculateMonthStats(params: {
       isWorkDay: d.isWorkDay,
       workMinutes: d.workMinutes,
       leaveMinutes: d.leaveMinutes,
-      overtimeMinutes: dayOvertime,
+      delayMinutes: d.delayMinutes,
+      entryDelayMinutes: d.entryDelayMinutes,
+      overtimeMinutes: d.overtimeMinutes,
       cumulativeWorkMinutes: cumTotalWork,
-      cumulativeOvertimeMinutes: cumTotalOvertime
+      cumulativeOvertimeMinutes: cumTotalOvertime,
+      cumulativeDelayMinutes: cumTotalDelay,
+      netOvertimeMinutes: netDayOvertime
     };
   }
 
-  // Ensure normal overtime also reflects month-end net surplus if higher
-  normalOvertimeMinutes = Math.max(normalOvertimeMinutes, Math.max(0, P_minutes - D_minutes));
-  const totalOvertimeMinutes = normalOvertimeMinutes + H_minutes;
+  const totalDelayMinutes = cumTotalDelay;
+  const grossOvertimeMinutes = cumTotalOvertime;
+  // User rule: "در پایان مجموع کسر کار یا تاخیر ها منهای اضافه کار میشه و باقی مانده برابر با اضافه کار میشه"
+  const netOvertimeMinutes = Math.max(0, grossOvertimeMinutes - totalDelayMinutes);
+  const netDelayDeficitMinutes = Math.max(0, totalDelayMinutes - grossOvertimeMinutes);
+
+  const elapsedNetOvertimeMinutes = Math.max(0, elapsedGrossOvertimeMinutes - elapsedDelayMinutes);
   const totalWorkMinutes = P_minutes + H_minutes;
+  const normalOvertimeMinutes = Math.max(0, netOvertimeMinutes - H_minutes);
 
   return {
     year,
@@ -454,9 +651,16 @@ export function calculateMonthStats(params: {
     daysWithWorkCount,
     daysWithLeaveCount,
     remainingMinutes,
+    totalDelayMinutes,
+    elapsedDelayMinutes,
+    grossOvertimeMinutes,
+    elapsedGrossOvertimeMinutes,
+    netOvertimeMinutes,
+    elapsedNetOvertimeMinutes,
+    netDelayDeficitMinutes,
     normalOvertimeMinutes,
-    totalOvertimeMinutes,
-    totalOvertime: totalOvertimeMinutes,
+    totalOvertimeMinutes: netOvertimeMinutes,
+    totalOvertime: netOvertimeMinutes,
     dailyBreakdown
   };
 }

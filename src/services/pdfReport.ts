@@ -26,6 +26,9 @@ export const PdfReportService = {
     const normalOvertime = Math.round(monthStats.normalOvertimeMinutes ?? 0);
     const holidayOvertime = Math.round(monthStats.H_minutes ?? 0);
     const totalWorkAndLeave = Math.round((monthStats.totalWorkMinutes || 0) + (monthStats.L_minutes || 0));
+    const totalDelay = Math.round(monthStats.totalDelayMinutes ?? 0);
+    const grossOvertime = Math.round(monthStats.grossOvertimeMinutes ?? totalOvertime);
+    const netOvertime = Math.round(monthStats.netOvertimeMinutes ?? Math.max(0, grossOvertime - totalDelay));
 
     const intervalsByDate = new Map<string, WorkInterval[]>();
     for (const item of intervals) {
@@ -84,6 +87,7 @@ export const PdfReportService = {
       }
 
       const rowBg = isHoliday ? '#fbfbfa' : rowIndex % 2 === 0 ? '#ffffff' : '#fafafa';
+      const hasDelay = day.delayMinutes > 0;
 
       tableRows += `
         <tr style="background-color: ${rowBg};">
@@ -99,6 +103,9 @@ export const PdfReportService = {
           <td style="text-align: right; font-size: 8.5pt; line-height: 1.4;">${leavesText}</td>
           <td style="text-align: center; font-family: monospace; font-weight: 700;">
             ${day.workMinutes > 0 ? formatMinutesToPersianHM(day.workMinutes) : '-'}
+          </td>
+          <td style="text-align: center; font-family: monospace; font-weight: 700; color: ${hasDelay ? '#b45309' : '#9ca3af'};">
+            ${hasDelay ? formatMinutesToPersianHM(day.delayMinutes) : '-'}
           </td>
           <td style="text-align: center; font-family: monospace; font-weight: 700; color: ${hasOvertime ? '#047857' : '#9ca3af'};">
             ${hasOvertime ? formatMinutesToPersianHM(day.overtimeMinutes) : '-'}
@@ -320,26 +327,31 @@ export const PdfReportService = {
     </div>
 
     <!-- Summary KPIs -->
-    <div class="kpi-grid">
+    <div class="kpi-grid" style="grid-template-columns: repeat(5, 1fr);">
       <div class="kpi-card">
         <span class="kpi-label">ساعات کاری</span>
         <div class="kpi-value">${formatMinutesToPersianHM(monthStats.totalWorkMinutes)}</div>
         <span class="kpi-sub">عادی: ${formatMinutesToPersianHM(monthStats.P_minutes)} | تعطیل: ${formatMinutesToPersianHM(monthStats.H_minutes)}</span>
       </div>
       <div class="kpi-card">
-        <span class="kpi-label">ساعات اضافه کار</span>
-        <div class="kpi-value" style="color: #047857;">${formatMinutesToPersianHM(totalOvertime)}</div>
-        <span class="kpi-sub">عادی: ${formatMinutesToPersianHM(normalOvertime)} | تعطیل: ${formatMinutesToPersianHM(holidayOvertime)}</span>
+        <span class="kpi-label" style="color: #b45309;">مجموع تاخیر و کسر کار</span>
+        <div class="kpi-value" style="color: #b45309;">${formatMinutesToPersianHM(totalDelay)}</div>
+        <span class="kpi-sub">ورود بعد از ۰۷:۱۵</span>
       </div>
       <div class="kpi-card">
-        <span class="kpi-label">ساعات موظفی کل ماه</span>
+        <span class="kpi-label">اضافه‌کار ناخالص</span>
+        <div class="kpi-value" style="color: #047857;">${formatMinutesToPersianHM(grossOvertime)}</div>
+        <span class="kpi-sub">خروج بعد از ۱۵:۳۰ / تعطیلات</span>
+      </div>
+      <div class="kpi-card" style="background-color: #ecfdf5; border-color: #a7f3d0;">
+        <span class="kpi-label" style="color: #047857;">اضافه‌کار خالص (نهایی)</span>
+        <div class="kpi-value" style="color: #047857;">${formatMinutesToPersianHM(netOvertime)}</div>
+        <span class="kpi-sub">کسر تاخیر از اضافه‌کار</span>
+      </div>
+      <div class="kpi-card">
+        <span class="kpi-label">ساعات موظفی ماه</span>
         <div class="kpi-value">${formatMinutesToPersianHM(monthStats.D_minutes)}</div>
-        <span class="kpi-sub">موظفی تا امروز: ${formatMinutesToPersianHM(monthStats.elapsedQuotaMinutes)}</span>
-      </div>
-      <div class="kpi-card">
-        <span class="kpi-label">کارکرد تا امروز (کاری + مرخصی)</span>
-        <div class="kpi-value">${formatMinutesToPersianHM(totalWorkAndLeave)}</div>
-        <span class="kpi-sub">ساعات مرخصی: ${formatMinutesToPersianHM(monthStats.L_minutes)}</span>
+        <span class="kpi-sub">مانده: ${formatMinutesToPersianHM(monthStats.remainingMinutes)}</span>
       </div>
     </div>
 
@@ -347,14 +359,15 @@ export const PdfReportService = {
     <table class="data-table">
       <thead>
         <tr>
-          <th style="width: 32px;">#</th>
-          <th style="width: 75px;">تاریخ</th>
-          <th style="width: 65px;">روز هفته</th>
-          <th style="width: 105px;">وضعیت روز</th>
-          <th style="width: 140px;">بازه‌های کاری</th>
-          <th style="width: 105px;">مرخصی</th>
-          <th style="width: 70px;">کارکرد</th>
-          <th style="width: 70px;">اضافه کار</th>
+          <th style="width: 30px;">#</th>
+          <th style="width: 72px;">تاریخ</th>
+          <th style="width: 60px;">روز هفته</th>
+          <th style="width: 95px;">وضعیت روز</th>
+          <th style="width: 130px;">بازه‌های کاری</th>
+          <th style="width: 95px;">مرخصی</th>
+          <th style="width: 65px;">کارکرد</th>
+          <th style="width: 65px;">تاخیر ورود</th>
+          <th style="width: 65px;">اضافه کار</th>
         </tr>
       </thead>
       <tbody>
@@ -364,7 +377,8 @@ export const PdfReportService = {
         <tr>
           <td colspan="6" style="text-align: left; padding-left: 14px; font-weight: 700;">مجموع کل ماه:</td>
           <td style="text-align: center; font-family: monospace; font-weight: 800;">${formatMinutesToPersianHM(monthStats.totalWorkMinutes)}</td>
-          <td style="text-align: center; font-family: monospace; font-weight: 800; color: #047857;">${formatMinutesToPersianHM(totalOvertime)}</td>
+          <td style="text-align: center; font-family: monospace; font-weight: 800; color: #b45309;">${formatMinutesToPersianHM(totalDelay)}</td>
+          <td style="text-align: center; font-family: monospace; font-weight: 800; color: #047857;">${formatMinutesToPersianHM(netOvertime)}</td>
         </tr>
       </tfoot>
     </table>

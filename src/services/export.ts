@@ -88,9 +88,9 @@ export const ExportService = {
     // Include UTF-8 BOM for Persian text rendering in Excel
     let csv = '\uFEFF';
     csv += `گزارش کارکرد ماه ${monthName} سال ${toPersianDigits(monthStats.year)}\n`;
-    csv += `ساعات کاری,${formatMinutesToPersianHM(monthStats.totalWorkMinutes)},ساعات موظفی,${formatMinutesToPersianHM(monthStats.D_minutes)},مانده موظفی,${formatMinutesToPersianHM(monthStats.remainingMinutes)},اضافه‌کار کل,${formatMinutesToPersianHM(totalOvertime)}\n\n`;
+    csv += `ساعات کاری,${formatMinutesToPersianHM(monthStats.totalWorkMinutes)},ساعات موظفی,${formatMinutesToPersianHM(monthStats.D_minutes)},مجموع تاخیر ماه,${formatMinutesToPersianHM(monthStats.totalDelayMinutes ?? 0)},اضافه‌کار خالص,${formatMinutesToPersianHM(monthStats.netOvertimeMinutes ?? totalOvertime)}\n\n`;
 
-    csv += 'ردیف,تاریخ,روز هفته,وضعیت روز,بازه‌های کاری,مرخصی,کارکرد (دقیقه),ساعت کارکرد,اضافه کار (دقیقه),ساعت اضافه کار\n';
+    csv += 'ردیف,تاریخ,روز هفته,وضعیت روز,بازه‌های کاری,مرخصی,ساعت کارکرد,تاخیر ورود,ساعت اضافه کار\n';
 
     const sortedDates = Object.keys(monthStats.dailyBreakdown).sort();
 
@@ -127,10 +127,9 @@ export const ExportService = {
         `"${status}"`,
         intervalsCell,
         leavesCell,
-        day.workMinutes,
-        `"${formatMinutesToPersianHM(day.workMinutes)}"`,
-        day.overtimeMinutes,
-        `"${formatMinutesToPersianHM(day.overtimeMinutes)}"`
+        `"${day.workMinutes > 0 ? formatMinutesToPersianHM(day.workMinutes) : '-'}"`,
+        `"${day.delayMinutes > 0 ? formatMinutesToPersianHM(day.delayMinutes) : '-'}"`,
+        `"${day.overtimeMinutes > 0 ? formatMinutesToPersianHM(day.overtimeMinutes) : '-'}"`
       ].join(',') + '\n';
 
       rowIndex += 1;
@@ -144,10 +143,9 @@ export const ExportService = {
       '',
       '',
       '',
-      monthStats.totalWorkMinutes,
       `"${formatMinutesToPersianHM(monthStats.totalWorkMinutes)}"`,
-      totalOvertime,
-      `"${formatMinutesToPersianHM(totalOvertime)}"`
+      `"${formatMinutesToPersianHM(monthStats.totalDelayMinutes ?? 0)}"`,
+      `"${formatMinutesToPersianHM(monthStats.netOvertimeMinutes ?? totalOvertime)}"`
     ].join(',') + '\n';
 
     return csv;
@@ -177,6 +175,8 @@ export const ExportService = {
     const monthName = PERSIAN_MONTH_NAMES[monthStats.month - 1];
     const totalOvertime = monthStats.totalOvertime ?? monthStats.totalOvertimeMinutes ?? 0;
     const totalWorkAndLeave = (monthStats.totalWorkMinutes || 0) + (monthStats.L_minutes || 0);
+    const totalDelay = monthStats.totalDelayMinutes ?? 0;
+    const netOvertime = monthStats.netOvertimeMinutes ?? Math.max(0, (monthStats.grossOvertimeMinutes ?? totalOvertime) - totalDelay);
 
     const intervalsByDate = new Map<string, WorkInterval[]>();
     for (const item of intervals) {
@@ -205,6 +205,7 @@ export const ExportService = {
 
       const isHoliday = day.isOfficialHoliday || day.isWeeklyHoliday;
       const hasOvertime = day.overtimeMinutes > 0;
+      const hasDelay = day.delayMinutes > 0;
 
       // Status badge style
       let statusHtml = '';
@@ -243,6 +244,7 @@ export const ExportService = {
         <td style="border: 1px solid #e5e7eb; padding: 8px 10px; font-family: monospace; font-size: 11px;">${intervalsHtml}</td>
         <td style="border: 1px solid #e5e7eb; padding: 8px 10px; font-size: 11px;">${leavesHtml}</td>
         <td style="border: 1px solid #e5e7eb; padding: 8px 10px; text-align: center; font-family: monospace; font-weight: bold; color: #111827;">${day.workMinutes > 0 ? formatMinutesToPersianHM(day.workMinutes) : '-'}</td>
+        <td style="border: 1px solid #e5e7eb; padding: 8px 10px; text-align: center; font-family: monospace; font-weight: bold; color: ${hasDelay ? '#b45309' : '#9ca3af'};">${hasDelay ? formatMinutesToPersianHM(day.delayMinutes) : '-'}</td>
         <td style="border: 1px solid #e5e7eb; padding: 8px 10px; text-align: center; font-family: monospace; font-weight: bold; color: ${hasOvertime ? '#059669' : '#9ca3af'};">${hasOvertime ? formatMinutesToPersianHM(day.overtimeMinutes) : '-'}</td>
       </tr>`;
 
@@ -279,9 +281,9 @@ export const ExportService = {
   <!-- Header Title -->
   <table style="width: 100%; border-collapse: collapse; margin-bottom: 12px;">
     <tr>
-      <td colspan="8" style="background-color: #f3f4f6; border: 1px solid #d1d5db; padding: 14px; text-align: center;">
+      <td colspan="9" style="background-color: #f3f4f6; border: 1px solid #d1d5db; padding: 14px; text-align: center;">
         <h2 style="margin: 0; font-size: 16pt; color: #111827; font-weight: bold;">جدول گزارش اکسل ماه ${monthName} سال ${toPersianDigits(monthStats.year)}</h2>
-        <span style="font-size: 10pt; color: #6b7280;">خلاصه آمار و جزئیات ساعات کارکرد، موظفی و اضافه‌کار</span>
+        <span style="font-size: 10pt; color: #6b7280;">خلاصه آمار شیفت (ورود ۰۷:۱۵ | خروج ۱۵:۳۰) با تهاتر تاخیر و اضافه‌کار</span>
       </td>
     </tr>
   </table>
@@ -298,12 +300,12 @@ export const ExportService = {
         <div style="font-size: 14pt; font-weight: bold; font-family: monospace; color: #111827;">${formatMinutesToPersianHM(monthStats.D_minutes)}</div>
       </td>
       <td style="width: 25%; background-color: #ffffff; border: 1px solid #d1d5db; padding: 10px; text-align: center;">
-        <div style="font-size: 9pt; color: #6b7280; margin-bottom: 4px;">ساعات اضافه کار</div>
-        <div style="font-size: 14pt; font-weight: bold; font-family: monospace; color: #059669;">${formatMinutesToPersianHM(totalOvertime)}</div>
+        <div style="font-size: 9pt; color: #b45309; font-weight: bold; margin-bottom: 4px;">مجموع تاخیر ماه</div>
+        <div style="font-size: 14pt; font-weight: bold; font-family: monospace; color: #b45309;">${formatMinutesToPersianHM(totalDelay)}</div>
       </td>
-      <td style="width: 25%; background-color: #ffffff; border: 1px solid #d1d5db; padding: 10px; text-align: center;">
-        <div style="font-size: 9pt; color: #6b7280; margin-bottom: 4px;">کارکرد تا امروز (کاری + مرخصی)</div>
-        <div style="font-size: 14pt; font-weight: bold; font-family: monospace; color: #111827;">${formatMinutesToPersianHM(totalWorkAndLeave)}</div>
+      <td style="width: 25%; background-color: #ecfdf5; border: 1px solid #a7f3d0; padding: 10px; text-align: center;">
+        <div style="font-size: 9pt; color: #047857; font-weight: bold; margin-bottom: 4px;">اضافه‌کار خالص (کسر تاخیر)</div>
+        <div style="font-size: 14pt; font-weight: bold; font-family: monospace; color: #047857;">${formatMinutesToPersianHM(netOvertime)}</div>
       </td>
     </tr>
   </table>
@@ -319,6 +321,7 @@ export const ExportService = {
         <th style="border: 1px solid #d1d5db; padding: 10px 8px; text-align: right; width: 180px;">بازه‌های کاری</th>
         <th style="border: 1px solid #d1d5db; padding: 10px 8px; text-align: right; width: 130px;">مرخصی</th>
         <th style="border: 1px solid #d1d5db; padding: 10px 8px; text-align: center; width: 95px;">ساعت کارکرد</th>
+        <th style="border: 1px solid #d1d5db; padding: 10px 8px; text-align: center; width: 95px;">تاخیر ورود</th>
         <th style="border: 1px solid #d1d5db; padding: 10px 8px; text-align: center; width: 95px;">ساعت اضافه کار</th>
       </tr>
     </thead>
@@ -329,7 +332,8 @@ export const ExportService = {
       <tr style="background-color: #e5e7eb; font-weight: bold; border-top: 2px solid #9ca3af;">
         <td colspan="6" style="border: 1px solid #d1d5db; padding: 12px 14px; text-align: left; font-size: 11pt; color: #111827;">مجموع کل ماه:</td>
         <td style="border: 1px solid #d1d5db; padding: 12px 8px; text-align: center; font-family: monospace; font-size: 12pt; color: #111827;">${formatMinutesToPersianHM(monthStats.totalWorkMinutes)}</td>
-        <td style="border: 1px solid #d1d5db; padding: 12px 8px; text-align: center; font-family: monospace; font-size: 12pt; color: #059669;">${formatMinutesToPersianHM(totalOvertime)}</td>
+        <td style="border: 1px solid #d1d5db; padding: 12px 8px; text-align: center; font-family: monospace; font-size: 12pt; color: #b45309;">${formatMinutesToPersianHM(totalDelay)}</td>
+        <td style="border: 1px solid #d1d5db; padding: 12px 8px; text-align: center; font-family: monospace; font-size: 12pt; color: #059669;">${formatMinutesToPersianHM(netOvertime)}</td>
       </tr>
     </tfoot>
   </table>

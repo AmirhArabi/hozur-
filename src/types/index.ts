@@ -32,12 +32,14 @@ export interface OfficialHoliday {
 
 export interface UserSettings {
   dailyQuotaHours: number; // e.g. 8
-  dailyQuotaMinutes: number; // e.g. 30 -> total 8h 30m
+  dailyQuotaMinutes: number; // e.g. 15 (07:15 to 15:30 is 8h 15m)
+  standardEntryTime?: string; // e.g. "07:15"
+  standardExitTime?: string; // e.g. "15:30"
   isThursdayHoliday: boolean; // Friday is always holiday
   departureReminderEnabled?: boolean;
   reminderMinutesBeforeQuota?: number;
   entryReminderEnabled: boolean; // یادآوری ثبت ورود
-  entryReminderTime: string; // HH:mm e.g. "09:00"
+  entryReminderTime: string; // HH:mm e.g. "07:15"
   theme: 'light' | 'dark';
 }
 
@@ -50,9 +52,13 @@ export interface DayCalculationResult {
   isWorkDay: boolean; // neither weekly nor official holiday
   workMinutes: number;
   leaveMinutes: number;
-  overtimeMinutes: number;
+  delayMinutes: number; // تاخیر ورود بعد از ۰۷:۱۵ (و کسر کار)
+  entryDelayMinutes: number; // تاخیر مشخص ورود
+  overtimeMinutes: number; // اضافه‌کار روزانه (خروج بعد از ۱۵:۳۰ یا کار در تعطیلات)
   cumulativeWorkMinutes: number;
-  cumulativeOvertimeMinutes: number;
+  cumulativeOvertimeMinutes: number; // مجموع اضافه‌کار ناخالص تا این روز
+  cumulativeDelayMinutes: number; // مجموع تاخیرها تا این روز
+  netOvertimeMinutes: number; // خالص اضافه‌کار تا این روز: max(0, cumulativeOvertime - cumulativeDelay)
 }
 
 export interface MonthCalculationResult {
@@ -70,8 +76,18 @@ export interface MonthCalculationResult {
   daysWithWorkCount: number;
   daysWithLeaveCount: number;
   remainingMinutes: number; // max(0, D - P - L)
+  
+  // Model for 07:15 entry delay & 15:30 exit overtime offset
+  totalDelayMinutes: number; // مجموع کسر کار یا تاخیرهای کل ماه
+  elapsedDelayMinutes: number; // مجموع تاخیرها تا امروز
+  grossOvertimeMinutes: number; // مجموع اضافه‌کار ناخالص (خروج بعد از ۱۵:۳۰ + کار تعطیلات)
+  elapsedGrossOvertimeMinutes: number; // مجموع اضافه‌کار ناخالص تا امروز
+  netOvertimeMinutes: number; // باقی‌مانده اضافه‌کار پس از کسر تاخیرها: max(0, grossOvertime - totalDelay)
+  elapsedNetOvertimeMinutes: number; // خالص اضافه‌کار تا امروز: max(0, elapsedGrossOvertime - elapsedDelay)
+  netDelayDeficitMinutes: number; // مانده تاخیر جبران‌نشده: max(0, totalDelay - grossOvertime)
+
   normalOvertimeMinutes: number; // max(0, P - D)
   totalOvertimeMinutes: number; // normalOvertime + H
-  totalOvertime?: number; // alias for totalOvertimeMinutes
+  totalOvertime?: number; // alias for totalOvertimeMinutes or netOvertimeMinutes
   dailyBreakdown: Record<string, DayCalculationResult>;
 }

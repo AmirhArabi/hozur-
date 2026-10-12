@@ -37,11 +37,30 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
 }) => {
   const [hoursInput, setHoursInput] = useState(String(settings.dailyQuotaHours));
   const [minutesInput, setMinutesInput] = useState(String(settings.dailyQuotaMinutes));
+  const [standardEntryInput, setStandardEntryInput] = useState(
+    settings.standardEntryTime || '07:15'
+  );
+  const [standardExitInput, setStandardExitInput] = useState(
+    settings.standardExitTime || '15:30'
+  );
   const [isHolidayModalOpen, setIsHolidayModalOpen] = useState(false);
   const [notificationMsg, setNotificationMsg] = useState<string | null>(null);
   const [backupStatus, setBackupStatus] = useState<string | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleSaveShiftSchedule = (e: React.FormEvent) => {
+    e.preventDefault();
+    onUpdateSettings({
+      ...settings,
+      standardEntryTime: standardEntryInput,
+      standardExitTime: standardExitInput
+    });
+    setNotificationMsg(
+      `ساعت ورود (${toPersianDigits(standardEntryInput)}) و خروج (${toPersianDigits(standardExitInput)}) با موفقیت ذخیره شد.`
+    );
+    setTimeout(() => setNotificationMsg(null), 3000);
+  };
 
   const handleSaveDailyQuota = (e: React.FormEvent) => {
     e.preventDefault();
@@ -183,13 +202,60 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
         </div>
       )}
 
-      {/* 1. Daily Quota Section */}
+      {/* 1. Standard Shift Schedule Section (ساعت ورود و خروج موظفی) */}
+      <div className="bg-white dark:bg-neutral-900 rounded-3xl border border-neutral-200 dark:border-neutral-800 p-4 shadow-xs">
+        <h3 className="font-bold text-sm text-neutral-900 dark:text-neutral-50 mb-1">
+          ساعت ورود و خروج موظفی شیفت
+        </h3>
+        <p className="text-xs text-neutral-500 mb-3">
+          ورود بعد از ساعت ورود تاخیر/کسر کار محسوب شده و خروج بعد از ساعت خروج اضافه‌کار محاسبه می‌شود. در پایان ماه تاخیرها از اضافه‌کار کسر می‌گردد.
+        </p>
+
+        <form onSubmit={handleSaveShiftSchedule} className="space-y-3">
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1">
+                ساعت ورود موظفی
+              </label>
+              <input
+                type="time"
+                value={standardEntryInput}
+                onChange={(e) => setStandardEntryInput(e.target.value)}
+                className="w-full h-11 px-3 rounded-xl border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 font-mono font-bold text-center focus:outline-hidden focus:ring-2 focus:ring-neutral-400"
+              />
+              <span className="text-[10px] text-neutral-400 mt-1 block">پیش‌فرض: ۰۷:۱۵</span>
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1">
+                ساعت ثابت خروج
+              </label>
+              <input
+                type="time"
+                value={standardExitInput}
+                onChange={(e) => setStandardExitInput(e.target.value)}
+                className="w-full h-11 px-3 rounded-xl border border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 font-mono font-bold text-center focus:outline-hidden focus:ring-2 focus:ring-neutral-400"
+              />
+              <span className="text-[10px] text-neutral-400 mt-1 block">پیش‌فرض: ۱۵:۳۰</span>
+            </div>
+          </div>
+
+          <button
+            type="submit"
+            className="w-full h-11 rounded-xl bg-neutral-900 hover:bg-neutral-800 dark:bg-white dark:hover:bg-neutral-100 text-white dark:text-neutral-900 text-xs font-bold flex items-center justify-center gap-1.5 active:scale-98 transition-all shadow-xs"
+          >
+            <Check className="w-4 h-4" />
+            ذخیره ساعات ورود و خروج شیفت
+          </button>
+        </form>
+      </div>
+
+      {/* 2. Daily Quota Section */}
       <div className="bg-white dark:bg-neutral-900 rounded-3xl border border-neutral-200 dark:border-neutral-800 p-4 shadow-xs">
         <h3 className="font-bold text-sm text-neutral-900 dark:text-neutral-50 mb-1">
           موظفی روزانه
         </h3>
         <p className="text-xs text-neutral-500 mb-3">
-          ساعت کاری تعیین‌شده برای روزهای کاری عادی (پیش‌فرض: ۸ ساعت و ۳۰ دقیقه)
+          ساعت کاری تعیین‌شده برای روزهای کاری عادی (پیش‌فرض: ۸ ساعت و ۱۵ دقیقه، مطابق ۰۷:۱۵ تا ۱۵:۳۰)
         </p>
 
         <form onSubmit={handleSaveDailyQuota} className="space-y-3">

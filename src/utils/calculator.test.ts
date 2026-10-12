@@ -217,20 +217,23 @@ test('calculateMonthStats elapsedWorkDaysCount and elapsedQuotaMinutes calculati
   );
 });
 
-test('calculateMonthStats daily overtime on normal work days shows immediately', () => {
+test('calculateMonthStats daily overtime on normal work days with 15:30 exit and 07:15 entry delay offset', () => {
   const testSettings = {
     ...DEFAULT_SETTINGS,
-    dailyQuotaHours: 8,
-    dailyQuotaMinutes: 30, // 510 minutes
+    standardEntryTime: '07:15',
+    standardExitTime: '15:30',
     isThursdayHoliday: false
   };
 
-  // Find a normal work day in Mehr 1404 (e.g. 1404/07/01 Saturday)
+  // User worked 08:00 to 18:30 on Saturday 1404/07/01
+  // - Entry was 08:00 vs expected 07:15 -> 45 minutes delay
+  // - Exit was 18:30 vs fixed 15:30 -> 180 minutes (3 hours) gross overtime
+  // - Net overtime = 180 - 45 = 135 minutes
   const workInterval = {
     id: 'w1',
     date: '1404/07/01', // Saturday
     startTime: '08:00',
-    endTime: '18:30', // 10h 30m = 630 minutes -> 120 minutes overtime
+    endTime: '18:30', // 10h 30m = 630 minutes total work
     createdAt: Date.now()
   };
 
@@ -243,20 +246,12 @@ test('calculateMonthStats daily overtime on normal work days shows immediately',
     settings: testSettings
   });
 
-  assert.equal(result.dailyBreakdown['1404/07/01'].workMinutes, 630);
-  assert.equal(
-    result.dailyBreakdown['1404/07/01'].overtimeMinutes,
-    120,
-    'Saturday daily overtime should be 120 minutes (2 hours)'
-  );
-  assert.equal(
-    result.normalOvertimeMinutes,
-    120,
-    'Monthly normal overtime should be 120 minutes (2 hours)'
-  );
-  assert.equal(
-    result.totalOvertimeMinutes,
-    120,
-    'Total overtime should be 120 minutes'
-  );
+  const dayResult = result.dailyBreakdown['1404/07/01'];
+  assert.equal(dayResult.workMinutes, 630);
+  assert.equal(dayResult.delayMinutes, 45, 'Delay should be 45 minutes (07:15 to 08:00)');
+  assert.equal(dayResult.overtimeMinutes, 180, 'Gross overtime past 15:30 should be 180 minutes');
+  assert.equal(dayResult.netOvertimeMinutes, 135, 'Net overtime after deducting 45m delay should be 135 minutes');
+  assert.equal(result.totalDelayMinutes, 45, 'Month total delay should be 45 minutes');
+  assert.equal(result.grossOvertimeMinutes, 180, 'Month gross overtime should be 180 minutes');
+  assert.equal(result.netOvertimeMinutes, 135, 'Month net overtime should be 135 minutes');
 });
