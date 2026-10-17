@@ -56,3 +56,36 @@ body {
   -ms-overflow-style: none;
   scrollbar-width: none;
 }
+
+/* Soft card shadow & tactile feedback */
+.pastel-card {
+  transition: transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.18s ease;
+}
+.pastel-card:active {
+  transform: scale(0.985);
+}
+
+/* Soft glowing pulse animation */
+@keyframes soft-pulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.03);
+    opacity: 0.9;
+  }
+}
+
+.animate-soft-pulse {
+  animation: soft-pulse 2.4s infinite cubic-bezier(0.4, 0, 0.6, 1);
+}
+
+/* Reduced motion preference */
+.reduced-motion *,
+.reduced-motion *::before,
+.reduced-motion *::after {
+  animation-duration: 0.001ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.001ms !important;
+}

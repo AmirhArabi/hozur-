@@ -4,13 +4,17 @@ import {
   Calendar,
   Check,
   Download,
+  Eye,
   Globe,
   Moon,
   Plus,
   RotateCcw,
+  Sparkles,
   Sun,
   Trash2,
-  Upload
+  Upload,
+  Volume2,
+  VolumeX
 } from 'lucide-react';
 import { OfficialHoliday, UserSettings } from '../types';
 import { DEFAULT_FIXED_HOLIDAYS } from '../utils/calculator';
@@ -18,6 +22,7 @@ import { toPersianDigits } from '../utils/jalali';
 import { ExportService } from '../services/export';
 import { StorageService } from '../services/storage';
 import { NotificationService } from '../services/notifications';
+import { SoundService } from '../services/sound';
 import { HolidayModal } from './HolidayModal';
 
 interface SettingsTabProps {
@@ -451,6 +456,166 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({
             </div>
           </div>
         )}
+      </div>
+
+      {/* Sound & Audio Effects */}
+      <div className="bg-white dark:bg-neutral-900 rounded-3xl border border-neutral-200 dark:border-neutral-800 p-4 shadow-xs space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+              {settings.soundEnabled !== false ? (
+                <Volume2 className="w-5 h-5" />
+              ) : (
+                <VolumeX className="w-5 h-5" />
+              )}
+            </div>
+            <div>
+              <div className="font-bold text-xs text-neutral-900 dark:text-neutral-100">
+                افکت‌های صوتی (Web Audio)
+              </div>
+              <div className="text-[11px] text-neutral-500">
+                پخش صدای تایید در هنگام ثبت ورود، خروج و لمس دکمه‌ها
+              </div>
+            </div>
+          </div>
+
+          <label className="relative inline-flex items-center cursor-pointer">
+            <input
+              type="checkbox"
+              checked={settings.soundEnabled !== false}
+              onChange={() => {
+                const next = settings.soundEnabled === false;
+                onUpdateSettings({ ...settings, soundEnabled: next });
+                if (next) SoundService.playPunchIn(true);
+              }}
+              className="sr-only peer"
+            />
+            <div className="w-11 h-6 bg-neutral-200 dark:bg-neutral-700 peer-focus:outline-hidden rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-neutral-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-neutral-950 dark:peer-checked:bg-white dark:after:border-neutral-900 dark:after:bg-neutral-950" />
+          </label>
+        </div>
+
+        {settings.soundEnabled !== false && (
+          <div className="pt-2 border-t border-neutral-100 dark:border-neutral-800 flex items-center justify-between">
+            <span className="text-[11px] text-neutral-400">
+              آزمایش جلوه‌های صوتی برنامه:
+            </span>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => SoundService.playPunchIn(true)}
+                className="px-2.5 py-1 rounded-xl bg-neutral-100 dark:bg-neutral-800 hover:bg-neutral-200 dark:hover:bg-neutral-700 text-neutral-800 dark:text-neutral-200 text-xs font-semibold active:scale-95 transition-all"
+              >
+                صدای ورود
+              </button>
+              <button
+                type="button"
+                onClick={() => SoundService.playPunchOut(true)}
+                className="px-2.5 py-1 rounded-xl bg-neutral-100 dark:bg-neutral-800 hover:bg-neutral-200 dark:hover:bg-neutral-700 text-neutral-800 dark:text-neutral-200 text-xs font-semibold active:scale-95 transition-all"
+              >
+                صدای خروج
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Motion & Animations Preference */}
+      <div className="bg-white dark:bg-neutral-900 rounded-3xl border border-neutral-200 dark:border-neutral-800 p-4 shadow-xs space-y-3">
+        <div className="flex items-center gap-2.5">
+          <div className="p-2 rounded-xl bg-violet-500/10 text-violet-600 dark:text-violet-400">
+            <Sparkles className="w-5 h-5" />
+          </div>
+          <div>
+            <div className="font-bold text-xs text-neutral-900 dark:text-neutral-100">
+              انیمیشن‌ها و جلوه‌های حرکتی
+            </div>
+            <div className="text-[11px] text-neutral-500">
+              تنظیم شدت انیمیشن‌های برنامه و ارقام پویا
+            </div>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-3 gap-2 pt-1">
+          {[
+            { id: 'normal', label: 'عادی و روان' },
+            { id: 'reduced', label: 'کاهش‌یافته' },
+            { id: 'off', label: 'خاموش' }
+          ].map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              onClick={() => {
+                onUpdateSettings({
+                  ...settings,
+                  motionPreference: item.id as any
+                });
+              }}
+              className={`py-2 px-1 text-center rounded-xl text-xs font-semibold transition-all ${
+                (settings.motionPreference || 'normal') === item.id
+                  ? 'bg-neutral-950 text-white dark:bg-white dark:text-neutral-950 shadow-xs'
+                  : 'bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400'
+              }`}
+            >
+              {item.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Card Visibility Customization */}
+      <div className="bg-white dark:bg-neutral-900 rounded-3xl border border-neutral-200 dark:border-neutral-800 p-4 shadow-xs space-y-3">
+        <div className="flex items-center gap-2.5">
+          <div className="p-2 rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400">
+            <Eye className="w-5 h-5" />
+          </div>
+          <div>
+            <div className="font-bold text-xs text-neutral-900 dark:text-neutral-100">
+              سفارشی‌سازی کارت‌های آماری
+            </div>
+            <div className="text-[11px] text-neutral-500">
+              انتخاب کارت‌های قابل نمایش در صفحه ثبت تردد
+            </div>
+          </div>
+        </div>
+
+        <div className="space-y-2 pt-1 divide-y divide-neutral-100 dark:divide-neutral-800">
+          {[
+            { key: 'delayToday', label: 'مقدار تاخیر امروز' },
+            { key: 'overtimeToday', label: 'اضافه‌کار امروز' },
+            { key: 'delayMonth', label: 'مجموع تاخیر تا امروز' },
+            { key: 'overtimeMonth', label: 'مجموع اضافه‌کار تا امروز' },
+            { key: 'netOvertime', label: 'اضافه‌کار خالص (پس از تهاتر)' }
+          ].map((item) => {
+            const currentVis = settings.cardVisibility || {};
+            const isVisible = (currentVis as any)[item.key] !== false;
+
+            return (
+              <label
+                key={item.key}
+                className="flex items-center justify-between py-2 cursor-pointer"
+              >
+                <span className="text-xs text-neutral-800 dark:text-neutral-200 font-medium">
+                  {item.label}
+                </span>
+                <input
+                  type="checkbox"
+                  checked={isVisible}
+                  onChange={() => {
+                    const next = {
+                      ...currentVis,
+                      [item.key]: !isVisible
+                    };
+                    onUpdateSettings({
+                      ...settings,
+                      cardVisibility: next
+                    });
+                  }}
+                  className="w-4 h-4 rounded text-neutral-950 dark:text-white"
+                />
+              </label>
+            );
+          })}
+        </div>
       </div>
 
       {/* 5. Backup & Restore Section */}

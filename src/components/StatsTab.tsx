@@ -3,6 +3,7 @@ import {
   AlertCircle,
   BarChart3,
   Calendar as CalendarIcon,
+  CalendarRange,
   CheckCircle2,
   ChevronLeft,
   ChevronRight,
@@ -15,7 +16,9 @@ import {
   Layers,
   PlusCircle,
   Printer,
-  RotateCcw
+  RotateCcw,
+  TrendingDown,
+  TrendingUp
 } from 'lucide-react';
 import {
   DayCalculationResult,
@@ -25,6 +28,11 @@ import {
   UserSettings,
   WorkInterval
 } from '../types';
+import {
+  calculateMonthStats,
+  calculateMonthComparison,
+  calculateWeeklyBreakdown
+} from '../utils/calculator';
 import {
   formatJalaliDate,
   getCurrentJalaliDate,
@@ -112,6 +120,31 @@ export const StatsTab: React.FC<StatsTabProps> = ({
 
     return { days, maxMinutes, totalMinutesAll, peakDay };
   }, [monthStats.dailyBreakdown]);
+
+  // Previous Month statistics for MoM comparison
+  const prevMonthStats = useMemo(() => {
+    const prevYear = statsMonth === 1 ? statsYear - 1 : statsYear;
+    const prevMonth = statsMonth === 1 ? 12 : statsMonth - 1;
+    return calculateMonthStats({
+      year: prevYear,
+      month: prevMonth,
+      intervals,
+      leaves,
+      holidays,
+      settings
+    });
+  }, [statsYear, statsMonth, intervals, leaves, holidays, settings]);
+
+  const monthComparison = useMemo(() => {
+    return calculateMonthComparison({
+      currentStats: monthStats,
+      previousStats: prevMonthStats
+    });
+  }, [monthStats, prevMonthStats]);
+
+  const weeklySummaries = useMemo(() => {
+    return calculateWeeklyBreakdown(monthStats);
+  }, [monthStats]);
 
   const handlePrevMonth = () => {
     if (statsMonth === 1) {
@@ -595,6 +628,154 @@ export const StatsTab: React.FC<StatsTabProps> = ({
         monthStats={monthStats}
         calculatedTotalOvertime={calculatedTotalOvertime}
       />
+
+      {/* Month-over-Month Comparison Card */}
+      <div className="bg-white dark:bg-neutral-900 rounded-3xl border border-neutral-200 dark:border-neutral-800 p-4 sm:p-5 shadow-xs space-y-3.5">
+        <div className="flex items-center justify-between pb-3 border-b border-neutral-100 dark:border-neutral-800">
+          <div className="flex items-center gap-2">
+            <div className="p-2 rounded-xl bg-violet-50 dark:bg-violet-950/40 text-violet-600 dark:text-violet-400">
+              <CalendarRange className="w-4 h-4" />
+            </div>
+            <div>
+              <h3 className="font-bold text-sm text-neutral-900 dark:text-neutral-50">
+                مقایسه با ماه گذشته
+              </h3>
+              <span className="text-[11px] text-neutral-400">
+                بررسی روند رشد کارکرد، تاخیر و اضافه‌کار
+              </span>
+            </div>
+          </div>
+          <div className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold ${
+            monthComparison.workDiffMinutes >= 0
+              ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300'
+              : 'bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300'
+          }`}>
+            {monthComparison.workDiffMinutes >= 0 ? (
+              <TrendingUp className="w-3.5 h-3.5" />
+            ) : (
+              <TrendingDown className="w-3.5 h-3.5" />
+            )}
+            <span>
+              {toPersianDigits(Math.abs(Math.round(monthComparison.workDiffPercentage)))}٪
+            </span>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-3 gap-2">
+          {/* Work Diff */}
+          <div className="p-3 rounded-2xl bg-neutral-50 dark:bg-neutral-800/50 border border-neutral-200/60 dark:border-neutral-700/60">
+            <div className="text-[11px] font-semibold text-neutral-500 mb-1">
+              تفاوت کارکرد
+            </div>
+            <div className={`font-mono font-bold text-base tabular-nums ${
+              monthComparison.workDiffMinutes >= 0
+                ? 'text-emerald-600 dark:text-emerald-400'
+                : 'text-rose-600 dark:text-rose-400'
+            }`}>
+              {monthComparison.workDiffMinutes >= 0 ? '+' : '−'}
+              {formatHMPersian(Math.abs(monthComparison.workDiffMinutes))}
+            </div>
+            <div className="text-[9px] text-neutral-400 mt-0.5 truncate">
+              نسبت به ماه قبل
+            </div>
+          </div>
+
+          {/* Delay Diff */}
+          <div className="p-3 rounded-2xl bg-neutral-50 dark:bg-neutral-800/50 border border-neutral-200/60 dark:border-neutral-700/60">
+            <div className="text-[11px] font-semibold text-neutral-500 mb-1">
+              تفاوت تاخیر
+            </div>
+            <div className={`font-mono font-bold text-base tabular-nums ${
+              monthComparison.delayDiffMinutes <= 0
+                ? 'text-emerald-600 dark:text-emerald-400'
+                : 'text-amber-600 dark:text-amber-400'
+            }`}>
+              {monthComparison.delayDiffMinutes >= 0 ? '+' : '−'}
+              {formatHMPersian(Math.abs(monthComparison.delayDiffMinutes))}
+            </div>
+            <div className="text-[9px] text-neutral-400 mt-0.5 truncate">
+              {monthComparison.delayDiffMinutes <= 0 ? 'کاهش (بهبود)' : 'افزایش تاخیر'}
+            </div>
+          </div>
+
+          {/* Overtime Diff */}
+          <div className="p-3 rounded-2xl bg-neutral-50 dark:bg-neutral-800/50 border border-neutral-200/60 dark:border-neutral-700/60">
+            <div className="text-[11px] font-semibold text-neutral-500 mb-1">
+              اضافه‌کار خالص
+            </div>
+            <div className={`font-mono font-bold text-base tabular-nums ${
+              monthComparison.overtimeDiffMinutes >= 0
+                ? 'text-emerald-600 dark:text-emerald-400'
+                : 'text-neutral-700 dark:text-neutral-300'
+            }`}>
+              {monthComparison.overtimeDiffMinutes >= 0 ? '+' : '−'}
+              {formatHMPersian(Math.abs(monthComparison.overtimeDiffMinutes))}
+            </div>
+            <div className="text-[9px] text-neutral-400 mt-0.5 truncate">
+              تغییر خالص
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Weekly Breakdown Summaries */}
+      <div className="bg-white dark:bg-neutral-900 rounded-3xl border border-neutral-200 dark:border-neutral-800 p-4 sm:p-5 shadow-xs space-y-3.5">
+        <div className="flex items-center justify-between pb-3 border-b border-neutral-100 dark:border-neutral-800">
+          <div className="flex items-center gap-2">
+            <div className="p-2 rounded-xl bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400">
+              <Layers className="w-4 h-4" />
+            </div>
+            <div>
+              <h3 className="font-bold text-sm text-neutral-900 dark:text-neutral-50">
+                گزارش هفتگی این ماه
+              </h3>
+              <span className="text-[11px] text-neutral-400">
+                تفکیک ۵ هفته کاری و وضعیت اضافه‌کار خالص
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <div className="space-y-2.5">
+          {weeklySummaries.map((week) => {
+            const weekMaxQuota = week.workDaysCount * (settings.dailyQuotaHours * 60 + settings.dailyQuotaMinutes);
+            const progress = weekMaxQuota > 0 ? Math.min(100, Math.round((week.workMinutes / weekMaxQuota) * 100)) : 0;
+
+            return (
+              <div
+                key={week.weekIndex}
+                className="p-3 rounded-2xl bg-neutral-50 dark:bg-neutral-800/40 border border-neutral-200/60 dark:border-neutral-700/60 flex items-center justify-between gap-3"
+              >
+                <div className="space-y-1 min-w-0 flex-1">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-xs text-neutral-900 dark:text-white">
+                      هفته {toPersianDigits(week.weekIndex)}
+                    </span>
+                    <span className="text-[10px] text-neutral-400 font-medium">
+                      ({toPersianDigits(week.startDate.slice(5))} تا {toPersianDigits(week.endDate.slice(5))})
+                    </span>
+                  </div>
+                  <div className="w-full bg-neutral-200 dark:bg-neutral-700 h-1.5 rounded-full overflow-hidden">
+                    <div
+                      className="bg-emerald-500 h-full rounded-full transition-all duration-500"
+                      style={{ width: `${progress}%` }}
+                    />
+                  </div>
+                </div>
+
+                <div className="text-left font-mono tabular-nums shrink-0 mr-3">
+                  <div className="text-xs font-bold text-neutral-950 dark:text-white">
+                    {formatHMPersian(week.workMinutes)}
+                  </div>
+                  <div className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold">
+                    +{formatHMPersian(week.netOvertimeMinutes)} اضافه
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
 
       {/* Weekly Work Hours Bar Chart (نمودار میله‌ای مجموع ساعات کاری در روزهای هفته) */}
       <div className="bg-white dark:bg-neutral-900 rounded-3xl border border-neutral-200 dark:border-neutral-800 p-4 sm:p-5 shadow-xs space-y-3.5">

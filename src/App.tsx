@@ -8,6 +8,7 @@ import { App as CapApp } from '@capacitor/app';
 import { StatusBar, Style } from '@capacitor/status-bar';
 import { Capacitor } from '@capacitor/core';
 import {
+  HistoryAction,
   LeaveRecord,
   OfficialHoliday,
   TabType,
@@ -30,15 +31,18 @@ import {
 } from './utils/jalali';
 import { StorageService } from './services/storage';
 import { NotificationService } from './services/notifications';
+import { HistoryService } from './services/history';
 import { Header } from './components/Header';
 import { BottomNav } from './components/BottomNav';
 import { RecordTab } from './components/RecordTab';
 import { StatsTab } from './components/StatsTab';
 import { SettingsTab } from './components/SettingsTab';
+import { UndoToast } from './components/common/UndoToast';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<TabType>('record');
   const [isLoading, setIsLoading] = useState(true);
+  const [undoAction, setUndoAction] = useState<HistoryAction | null>(null);
 
   // App Data State
   const [intervals, setIntervals] = useState<WorkInterval[]>([]);
@@ -181,6 +185,16 @@ export default function App() {
     }
   }, [settings.theme]);
 
+  // Motion preference synchronization
+  useEffect(() => {
+    const root = document.documentElement;
+    if (settings.motionPreference === 'reduced' || settings.motionPreference === 'off') {
+      root.classList.add('reduced-motion');
+    } else {
+      root.classList.remove('reduced-motion');
+    }
+  }, [settings.motionPreference]);
+
   // Data persistence handlers
   const handleSaveInterval = async (
     intervalData: Omit<WorkInterval, 'id' | 'createdAt'>,
@@ -204,6 +218,15 @@ export default function App() {
   };
 
   const handleDeleteInterval = async (id: string) => {
+    const target = intervals.find((i) => i.id === id);
+    if (target) {
+      const action = HistoryService.recordAction(
+        'delete_interval',
+        `حذف تردد ${toPersianDigits(target.startTime)}${target.endTime ? ` تا ${toPersianDigits(target.endTime)}` : ''}`,
+        target
+      );
+      setUndoAction(action);
+    }
     const updated = intervals.filter((i) => i.id !== id);
     setIntervals(updated);
     await StorageService.saveIntervals(updated);
@@ -229,9 +252,32 @@ export default function App() {
   };
 
   const handleDeleteLeave = async (id: string) => {
+    const target = leaves.find((l) => l.id === id);
+    if (target) {
+      const action = HistoryService.recordAction(
+        'delete_leave',
+        `حذف مرخصی ${target.type === 'full_day' ? 'روزانه' : 'ساعتی'}`,
+        target
+      );
+      setUndoAction(action);
+    }
     const updated = leaves.filter((l) => l.id !== id);
     setLeaves(updated);
     await StorageService.saveLeaves(updated);
+  };
+
+  const handleUndo = async (action: HistoryAction) => {
+    if (action.actionType === 'delete_interval' && action.previousData) {
+      const restored = [action.previousData as WorkInterval, ...intervals];
+      setIntervals(restored);
+      await StorageService.saveIntervals(restored);
+      setUndoAction(null);
+    } else if (action.actionType === 'delete_leave' && action.previousData) {
+      const restored = [action.previousData as LeaveRecord, ...leaves];
+      setLeaves(restored);
+      await StorageService.saveLeaves(restored);
+      setUndoAction(null);
+    }
   };
 
   const handleUpdateSettings = async (newSettings: UserSettings) => {
@@ -300,6 +346,7 @@ export default function App() {
           })
         }
         todayPersianDateString={todayHeaderString}
+        soundEnabled={settings.soundEnabled !== false}
       />
 
       {/* Main Content Area */}
@@ -318,6 +365,7 @@ export default function App() {
             onDeleteInterval={handleDeleteInterval}
             onSaveLeave={handleSaveLeave}
             onDeleteLeave={handleDeleteLeave}
+            holidays={holidays}
           />
         )}
 
@@ -352,8 +400,19 @@ export default function App() {
         )}
       </main>
 
+      {/* Undo Action Toast Banner */}
+      <UndoToast
+        action={undoAction}
+        onUndo={handleUndo}
+        onDismiss={() => setUndoAction(null)}
+      />
+
       {/* Fixed Bottom Navigation */}
-      <BottomNav activeTab={activeTab} onChangeTab={setActiveTab} />
+      <BottomNav
+        activeTab={activeTab}
+        onChangeTab={setActiveTab}
+        soundEnabled={settings.soundEnabled !== false}
+      />
     </div>
   );
 }

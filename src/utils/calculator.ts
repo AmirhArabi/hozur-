@@ -20,8 +20,10 @@ import {
   DayCalculationResult,
   LeaveRecord,
   MonthCalculationResult,
+  MonthComparisonResult,
   OfficialHoliday,
   UserSettings,
+  WeeklySummary,
   WorkInterval
 } from '../types';
 import {
@@ -139,7 +141,20 @@ export const DEFAULT_SETTINGS: UserSettings = {
   reminderMinutesBeforeQuota: 0,
   entryReminderEnabled: false,
   entryReminderTime: '07:15',
-  theme: 'dark'
+  theme: 'dark',
+  soundEnabled: true,
+  motionPreference: 'normal',
+  weeklySummaryEnabled: true,
+  incompleteReminderEnabled: true,
+  backupReminderEnabled: true,
+  cardVisibility: {
+    delayToday: true,
+    overtimeToday: true,
+    delayMonth: true,
+    overtimeMonth: true,
+    netOvertime: true,
+    workProgress: true
+  }
 };
 
 /**
@@ -663,4 +678,96 @@ export function calculateMonthStats(params: {
     totalOvertime: netOvertimeMinutes,
     dailyBreakdown
   };
+}
+
+/**
+ * Calculates comparative statistics between current month and previous month
+ */
+export function calculateMonthComparison(params: {
+  currentStats: MonthCalculationResult;
+  previousStats: MonthCalculationResult;
+}): MonthComparisonResult {
+  const { currentStats, previousStats } = params;
+
+  const currentTotalWork = currentStats.totalWorkMinutes;
+  const previousTotalWork = previousStats.totalWorkMinutes;
+  const workDiffMinutes = currentTotalWork - previousTotalWork;
+  const workDiffPercentage =
+    previousTotalWork > 0 ? (workDiffMinutes / previousTotalWork) * 100 : 0;
+
+  const currentTotalDelay = currentStats.totalDelayMinutes;
+  const previousTotalDelay = previousStats.totalDelayMinutes;
+  const delayDiffMinutes = currentTotalDelay - previousTotalDelay;
+
+  const currentNetOvertime = currentStats.netOvertimeMinutes;
+  const previousNetOvertime = previousStats.netOvertimeMinutes;
+  const overtimeDiffMinutes = currentNetOvertime - previousNetOvertime;
+
+  const currentLeave = currentStats.L_minutes;
+  const previousLeave = previousStats.L_minutes;
+  const leaveDiffMinutes = currentLeave - previousLeave;
+
+  return {
+    currentTotalWork,
+    previousTotalWork,
+    workDiffMinutes,
+    workDiffPercentage,
+    currentTotalDelay,
+    previousTotalDelay,
+    delayDiffMinutes,
+    currentNetOvertime,
+    previousNetOvertime,
+    overtimeDiffMinutes,
+    currentLeave,
+    previousLeave,
+    leaveDiffMinutes
+  };
+}
+
+/**
+ * Breaks down month into weekly summaries (Weeks 1 to 5)
+ */
+export function calculateWeeklyBreakdown(monthStats: MonthCalculationResult): WeeklySummary[] {
+  const days = Object.values(monthStats.dailyBreakdown);
+  if (days.length === 0) return [];
+
+  const summaries: WeeklySummary[] = [];
+  const weekChunks = [
+    { weekIndex: 1, startDay: 1, endDay: 7 },
+    { weekIndex: 2, startDay: 8, endDay: 14 },
+    { weekIndex: 3, startDay: 15, endDay: 21 },
+    { weekIndex: 4, startDay: 22, endDay: 28 },
+    { weekIndex: 5, startDay: 29, endDay: 31 }
+  ];
+
+  weekChunks.forEach((chunk) => {
+    const chunkDays = days.filter((d) => {
+      const parts = d.date.split('/');
+      const dayNum = parseInt(parts[2], 10);
+      return dayNum >= chunk.startDay && dayNum <= chunk.endDay;
+    });
+
+    if (chunkDays.length > 0) {
+      const workMinutes = chunkDays.reduce((acc, d) => acc + d.workMinutes, 0);
+      const leaveMinutes = chunkDays.reduce((acc, d) => acc + d.leaveMinutes, 0);
+      const delayMinutes = chunkDays.reduce((acc, d) => acc + d.delayMinutes, 0);
+      const overtimeMinutes = chunkDays.reduce((acc, d) => acc + d.overtimeMinutes, 0);
+      const netOvertimeMinutes = Math.max(0, overtimeMinutes - delayMinutes);
+      const workDaysCount = chunkDays.filter((d) => d.isWorkDay).length;
+
+      summaries.push({
+        weekIndex: chunk.weekIndex,
+        startDate: chunkDays[0].date,
+        endDate: chunkDays[chunkDays.length - 1].date,
+        workMinutes,
+        leaveMinutes,
+        delayMinutes,
+        overtimeMinutes,
+        netOvertimeMinutes,
+        workDaysCount
+      });
+    }
+  });
+
+  return summaries;
 }

@@ -9,14 +9,17 @@ import {
   Clock,
   Coffee,
   Edit2,
+  FileText,
   Hourglass,
   Layers,
   LogIn,
   LogOut,
   Plus,
+  ShieldAlert,
+  Sparkles,
   Trash2
 } from 'lucide-react';
-import { LeaveRecord, MonthCalculationResult, UserSettings, WorkInterval } from '../types';
+import { LeaveRecord, MonthCalculationResult, OfficialHoliday, UserSettings, WorkInterval } from '../types';
 import {
   calculateDayShiftEvaluation,
   calculateIntervalMinutes,
@@ -35,9 +38,14 @@ import {
   toJalali,
   toPersianDigits
 } from '../utils/jalali';
+import { SoundService } from '../services/sound';
+import { HistoryService } from '../services/history';
+import { auditAttendanceRecords } from '../services/audit';
 import { IntervalModal } from './IntervalModal';
 import { JalaliDatePickerModal } from './JalaliDatePickerModal';
 import { DeficitPromptModal } from './DeficitPromptModal';
+import { AuditIssuesModal } from './AuditIssuesModal';
+import { PdfReportModal } from './PdfReportModal';
 
 interface RecordTabProps {
   selectedDate: string; // YYYY/MM/DD
@@ -52,6 +60,7 @@ interface RecordTabProps {
   onDeleteInterval: (id: string) => void;
   onSaveLeave: (leave: Omit<LeaveRecord, 'id' | 'createdAt'>, id?: string) => void;
   onDeleteLeave: (id: string) => void;
+  holidays?: OfficialHoliday[];
 }
 
 export const RecordTab: React.FC<RecordTabProps> = ({
@@ -66,14 +75,23 @@ export const RecordTab: React.FC<RecordTabProps> = ({
   onSaveInterval,
   onDeleteInterval,
   onSaveLeave,
-  onDeleteLeave
+  onDeleteLeave,
+  holidays = []
 }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalDefaultIsPrimary, setModalDefaultIsPrimary] = useState(false);
   const [editingInterval, setEditingInterval] = useState<WorkInterval | null>(null);
   const [editingLeave, setEditingLeave] = useState<LeaveRecord | null>(null);
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
+  const [isAuditModalOpen, setIsAuditModalOpen] = useState(false);
+  const [isPdfModalOpen, setIsPdfModalOpen] = useState(false);
   const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null);
+
+  // Smart audit for irregular, open past, or overlapping records
+  const auditIssues = useMemo(
+    () => auditAttendanceRecords({ intervals, leaves, holidays, settings }),
+    [intervals, leaves, holidays, settings]
+  );
 
   // Live second-by-second ticker for real-time status and stopwatch
   const [nowSeconds, setNowSeconds] = useState<number>(() => {
@@ -248,6 +266,14 @@ export const RecordTab: React.FC<RecordTabProps> = ({
       return;
     }
 
+    SoundService.playPunchIn(settings.soundEnabled);
+    HistoryService.recordAction('create_interval', `ثبت ورود در ساعت ${toPersianDigits(startStr)}`, undefined, {
+      date: selectedDate,
+      startTime: startStr,
+      endTime: null,
+      isPrimary: true
+    });
+
     onSaveInterval({
       date: selectedDate,
       startTime: startStr,
@@ -288,6 +314,7 @@ export const RecordTab: React.FC<RecordTabProps> = ({
     if (isWorkDay) {
       const deficit = targetDailyQuota - (projectedTotalWorkToday + totalDayLeaveMinutes);
       if (deficit > 15) {
+        SoundService.playWarning(settings.soundEnabled);
         // Prompt user with under-hours alert and suggested leave
         setDeficitModalData({
           interval: targetInterval,
@@ -299,6 +326,12 @@ export const RecordTab: React.FC<RecordTabProps> = ({
         return;
       }
     }
+
+    SoundService.playPunchOut(settings.soundEnabled);
+    HistoryService.recordAction('update_interval', `ثبت پایان در ساعت ${toPersianDigits(endStr)}`, targetInterval, {
+      ...targetInterval,
+      endTime: endStr
+    });
 
     // Direct save if deficit <= 15 or on holiday
     onSaveInterval(
@@ -322,6 +355,8 @@ export const RecordTab: React.FC<RecordTabProps> = ({
   ) => {
     if (!deficitModalData) return;
     const { interval, endTimeString } = deficitModalData;
+
+    SoundService.playPunchOut(settings.soundEnabled);
 
     // 1. Close interval
     onSaveInterval(
@@ -353,6 +388,8 @@ export const RecordTab: React.FC<RecordTabProps> = ({
   const handleConfirmWithoutLeave = () => {
     if (!deficitModalData) return;
     const { interval, endTimeString } = deficitModalData;
+
+    SoundService.playPunchOut(settings.soundEnabled);
 
     onSaveInterval(
       {
@@ -431,6 +468,37 @@ export const RecordTab: React.FC<RecordTabProps> = ({
         </div>
       </div>
 
+      {/* Smart Audit Alert Banner */}
+      {auditIssues.length > 0 && (
+        <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-300 dark:border-amber-700/60 flex items-center justify-between gap-3 shadow-xs animate-in fade-in">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="p-2 rounded-xl bg-amber-500/20 text-amber-600 dark:text-amber-400 shrink-0">
+              <ShieldAlert className="w-5 h-5" />
+            </div>
+            <div className="min-w-0">
+              <div className="font-bold text-xs text-amber-950 dark:text-amber-100 flex items-center gap-1.5">
+                <span>ممیزی هوشمند ترددها</span>
+                <span className="px-1.5 py-0.5 rounded-full bg-amber-500 text-white text-[10px] font-mono font-bold">
+                  {toPersianDigits(auditIssues.length)}
+                </span>
+              </div>
+              <div className="text-[11px] text-amber-800 dark:text-amber-300 truncate">
+                تردد باز از روزهای گذشته یا عدم تطابق زمانی شناسایی شد
+              </div>
+            </div>
+          </div>
+          <button
+            onClick={() => {
+              SoundService.playTap(settings.soundEnabled);
+              setIsAuditModalOpen(true);
+            }}
+            className="px-3 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs shrink-0 active:scale-95 transition-all shadow-xs"
+          >
+            مشاهده و اصلاح
+          </button>
+        </div>
+      )}
+
       {/* Entry Reminder Alert Banner if user hasn't registered entry yet */}
       {showEntryReminderAlert && (
         <div className="p-3.5 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 flex items-center justify-between gap-3 shadow-xs">
@@ -455,6 +523,80 @@ export const RecordTab: React.FC<RecordTabProps> = ({
           </button>
         </div>
       )}
+
+      {/* Pastel Rounded Quick Action Cards */}
+      <div className="grid grid-cols-4 gap-2">
+        {/* Action 1: ثبت مرخصی */}
+        <button
+          onClick={() => {
+            SoundService.playTap(settings.soundEnabled);
+            setEditingInterval(null);
+            setEditingLeave(null);
+            setIsModalOpen(true);
+          }}
+          className="pastel-card p-2.5 rounded-2xl bg-violet-50 hover:bg-violet-100/70 dark:bg-violet-950/30 dark:hover:bg-violet-900/40 border border-violet-200/70 dark:border-violet-800/40 flex flex-col items-center justify-center text-center gap-1.5 group shadow-2xs"
+        >
+          <div className="w-9 h-9 rounded-xl bg-violet-100 dark:bg-violet-900/50 text-violet-600 dark:text-violet-300 flex items-center justify-center group-hover:scale-105 transition-transform">
+            <Coffee className="w-4 h-4" />
+          </div>
+          <span className="text-[11px] font-bold text-violet-950 dark:text-violet-200 truncate w-full">
+            ثبت مرخصی
+          </span>
+        </button>
+
+        {/* Action 2: تقویم */}
+        <button
+          onClick={() => {
+            SoundService.playTap(settings.soundEnabled);
+            setIsCalendarOpen(true);
+          }}
+          className="pastel-card p-2.5 rounded-2xl bg-sky-50 hover:bg-sky-100/70 dark:bg-sky-950/30 dark:hover:bg-sky-900/40 border border-sky-200/70 dark:border-sky-800/40 flex flex-col items-center justify-center text-center gap-1.5 group shadow-2xs"
+        >
+          <div className="w-9 h-9 rounded-xl bg-sky-100 dark:bg-sky-900/50 text-sky-600 dark:text-sky-300 flex items-center justify-center group-hover:scale-105 transition-transform">
+            <Calendar className="w-4 h-4" />
+          </div>
+          <span className="text-[11px] font-bold text-sky-950 dark:text-sky-200 truncate w-full">
+            تقویم ماه
+          </span>
+        </button>
+
+        {/* Action 3: ممیزی ترددها */}
+        <button
+          onClick={() => {
+            SoundService.playTap(settings.soundEnabled);
+            setIsAuditModalOpen(true);
+          }}
+          className="pastel-card p-2.5 rounded-2xl bg-amber-50 hover:bg-amber-100/70 dark:bg-amber-950/30 dark:hover:bg-amber-900/40 border border-amber-200/70 dark:border-amber-800/40 flex flex-col items-center justify-center text-center gap-1.5 group shadow-2xs relative"
+        >
+          {auditIssues.length > 0 && (
+            <span className="absolute -top-1 -right-1 w-4 h-4 bg-rose-500 text-white rounded-full text-[9px] font-mono font-bold flex items-center justify-center shadow-xs">
+              {auditIssues.length}
+            </span>
+          )}
+          <div className="w-9 h-9 rounded-xl bg-amber-100 dark:bg-amber-900/50 text-amber-600 dark:text-amber-300 flex items-center justify-center group-hover:scale-105 transition-transform">
+            <ShieldAlert className="w-4 h-4" />
+          </div>
+          <span className="text-[11px] font-bold text-amber-950 dark:text-amber-200 truncate w-full">
+            ممیزی تردد
+          </span>
+        </button>
+
+        {/* Action 4: گزارش PDF */}
+        <button
+          onClick={() => {
+            SoundService.playTap(settings.soundEnabled);
+            setIsPdfModalOpen(true);
+          }}
+          className="pastel-card p-2.5 rounded-2xl bg-emerald-50 hover:bg-emerald-100/70 dark:bg-emerald-950/30 dark:hover:bg-emerald-900/40 border border-emerald-200/70 dark:border-emerald-800/40 flex flex-col items-center justify-center text-center gap-1.5 group shadow-2xs"
+        >
+          <div className="w-9 h-9 rounded-xl bg-emerald-100 dark:bg-emerald-900/50 text-emerald-600 dark:text-emerald-300 flex items-center justify-center group-hover:scale-105 transition-transform">
+            <FileText className="w-4 h-4" />
+          </div>
+          <span className="text-[11px] font-bold text-emerald-950 dark:text-emerald-200 truncate w-full">
+            گزارش PDF
+          </span>
+        </button>
+      </div>
 
       {/* Summary Cards: آمار شیفت روز و مقادیر تجمیعی ماه */}
       <div className="space-y-2">
@@ -1072,6 +1214,47 @@ export const RecordTab: React.FC<RecordTabProps> = ({
         endTimeString={deficitModalData?.endTimeString || ''}
         onConfirmWithLeave={handleConfirmWithLeave}
         onConfirmWithoutLeave={handleConfirmWithoutLeave}
+      />
+
+      {/* Audit Issues Modal */}
+      <AuditIssuesModal
+        isOpen={isAuditModalOpen}
+        onClose={() => setIsAuditModalOpen(false)}
+        issues={auditIssues}
+        intervals={intervals}
+        onAutoFixCloseInterval={(intervalId, defaultExitTime) => {
+          const target = intervals.find((i) => i.id === intervalId);
+          if (target) {
+            SoundService.playPunchOut(settings.soundEnabled);
+            onSaveInterval(
+              {
+                date: target.date,
+                startTime: target.startTime,
+                endTime: defaultExitTime,
+                note: target.note,
+                isPrimary: target.isPrimary
+              },
+              target.id
+            );
+            showFeedback(`تردد با موفقیت روی ساعت ${toPersianDigits(defaultExitTime)} بسته شد.`);
+          }
+        }}
+        onDeleteInterval={(intervalId) => {
+          SoundService.playWarning(settings.soundEnabled);
+          onDeleteInterval(intervalId);
+          showFeedback('تردد حذف شد.');
+        }}
+        standardExitTime={settings.standardExitTime || '15:30'}
+      />
+
+      {/* PDF Report Modal */}
+      <PdfReportModal
+        isOpen={isPdfModalOpen}
+        onClose={() => setIsPdfModalOpen(false)}
+        monthStats={monthStats}
+        intervals={intervals}
+        leaves={leaves}
+        settings={settings}
       />
     </div>
   );

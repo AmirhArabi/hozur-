@@ -41,6 +41,70 @@ export interface UserSettings {
   entryReminderEnabled: boolean; // یادآوری ثبت ورود
   entryReminderTime: string; // HH:mm e.g. "07:15"
   theme: 'light' | 'dark';
+  // New features:
+  soundEnabled?: boolean;
+  motionPreference?: 'normal' | 'reduced' | 'off';
+  weeklySummaryEnabled?: boolean;
+  incompleteReminderEnabled?: boolean;
+  backupReminderEnabled?: boolean;
+  cardVisibility?: {
+    delayToday?: boolean;
+    overtimeToday?: boolean;
+    delayMonth?: boolean;
+    overtimeMonth?: boolean;
+    netOvertime?: boolean;
+    workProgress?: boolean;
+  };
+}
+
+export interface HistoryAction {
+  id: string;
+  timestamp: number;
+  actionType: 'create_interval' | 'update_interval' | 'delete_interval' | 'create_leave' | 'update_leave' | 'delete_leave';
+  description: string;
+  previousData?: any;
+  newData?: any;
+}
+
+export interface IncompleteRecordIssue {
+  id: string;
+  date: string;
+  type: 'open_past_interval' | 'excessive_duration' | 'overlapping' | 'unrecorded_workday';
+  severity: 'warning' | 'error' | 'info';
+  title: string;
+  description: string;
+  intervalId?: string;
+}
+
+export interface WeeklySummary {
+  weekIndex: number; // 1, 2, 3, 4, 5
+  startDate: string;
+  endDate: string;
+  workMinutes: number;
+  leaveMinutes: number;
+  delayMinutes: number;
+  overtimeMinutes: number;
+  netOvertimeMinutes: number;
+  workDaysCount: number;
+}
+
+export interface MonthComparisonResult {
+  currentTotalWork: number;
+  previousTotalWork: number;
+  workDiffMinutes: number;
+  workDiffPercentage: number;
+  
+  currentTotalDelay: number;
+  previousTotalDelay: number;
+  delayDiffMinutes: number;
+
+  currentNetOvertime: number;
+  previousNetOvertime: number;
+  overtimeDiffMinutes: number;
+
+  currentLeave: number;
+  previousLeave: number;
+  leaveDiffMinutes: number;
 }
 
 export interface DayCalculationResult {
